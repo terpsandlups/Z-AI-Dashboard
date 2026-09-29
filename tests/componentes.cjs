@@ -8,7 +8,7 @@ vm.runInContext("page=1;render();lossMode='grouped';renderLossGrid()",sandbox);a
 vm.runInContext("lossMode='individual';renderLossGrid()",sandbox);assert(nodes['#lossGrid'].innerHTML.includes('2026-09-27'),'Perda posterior ao corte de vendas deve aparecer');
 assert(nodes['#content'].innerHTML.includes('Aguardando vendas dos dias mais recentes'),'Percentual total não pode misturar coberturas');
 vm.runInContext("lossQuery='naoexisteprodutoabcdef';renderLossGrid()",sandbox);assert(nodes['#lossGrid'].innerHTML.includes('Nenhum lançamento'));
-vm.runInContext("page=7;render();cloud=true;data.papel='importador';$('#reportType').value='auditorias';$('#reportType').onchange()",sandbox);assert(nodes['#lossFile'].disabled);assert(nodes['#typeGuide'].textContent.includes('aguardando'));
+vm.runInContext("page=7;render();cloud=true;data.papel='importador';$('#reportType').value='saida_estoque';$('#reportType').onchange()",sandbox);assert(nodes['#content'].innerHTML.includes('Central de importações'));assert(nodes['#lossFile'].disabled);assert(nodes['#typeGuide'].textContent.toLowerCase().includes('aguarda'));
 vm.runInContext("$('#reportType').value='vendas';$('#reportType').onchange()",sandbox);assert(!nodes['#lossFile'].disabled);assert(nodes['#importMode'].disabled);
 vm.runInContext("$('#sidebarToggle').onclick()",sandbox);assert(classes.has('expanded'));
 console.log('OK: geração, busca, agrupamento, tipo obrigatório, bloqueio de categorias sem layout e sidebar. Não é teste visual.');

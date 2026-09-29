@@ -28,6 +28,16 @@ function departmentRows(data,c){
  c.sales.forEach(r=>get(r[2]).sales+=Number(r[4]));c.loss.forEach(r=>get(r[2]).loss+=Number(r[5]));
  return [...map.values()].map(r=>({...r,ratio:c.comparable&&r.sales>0?r.loss/r.sales:null,target:r.goal?.meta_perda??null})).sort((a,b)=>b.sales-a.sales);
 }
+function departmentAnalytics(data,c){
+ const rows=departmentRows(data,c),storeSales=Number(c.salesTotal||0),storeLoss=Number(c.lossTotal||0);
+ return rows.map(r=>{
+  const salesShare=storeSales>0?r.sales/storeSales:null;
+  const lossShare=storeLoss>0?r.loss/storeLoss:null;
+  const storeLossImpact=c.comparable&&storeSales>0?r.loss/storeSales:null;
+  const shareGap=salesShare!==null&&lossShare!==null?lossShare-salesShare:null;
+  return {...r,salesShare,lossShare,storeLossImpact,shareGap};
+ });
+}
 function weekdays(data,c,dept=''){
  const out=Array.from({length:7},()=>({days:0,value:0})),covered=new Set(data.dias_vendas_completos||[]);
  for(const d of covered)if(c.months.includes(d.slice(0,7)))out[new Date(d+'T12:00:00Z').getUTCDay()].days++;
@@ -42,5 +52,5 @@ function validateLossImport(d,data){
  }
  return d.rows;
 }
-const api={dailyGoal,lossTarget,sum,days,dateList,monthRange,select,departmentRows,weekdays,validateLossImport};root.ZAI=api;if(typeof module!=='undefined')module.exports=api;
+const api={dailyGoal,lossTarget,sum,days,dateList,monthRange,select,departmentRows,departmentAnalytics,weekdays,validateLossImport};root.ZAI=api;if(typeof module!=='undefined')module.exports=api;
 })(typeof window==='undefined'?globalThis:window);

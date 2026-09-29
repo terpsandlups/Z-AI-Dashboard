@@ -4,7 +4,7 @@ const sandbox={console,Intl,Date,Map,Set,URL,Blob,TextEncoder,setTimeout,clearTi
 for(const f of ['core.js','app.js','ui.js']){vm.runInContext(fs.readFileSync(root+'/web/'+f,'utf8'),sandbox);if(f==='core.js')sandbox.ZAI=sandbox.window.ZAI;}
 sandbox.inputData=require('./fixture.cjs')();vm.runInContext('setData(inputData,false)',sandbox);
 for(let i=0;i<8;i++){vm.runInContext('page='+i+';render()',sandbox);assert(nodes['#content'].innerHTML.length>200);assert(!nodes['#content'].innerHTML.includes('Imprimir'));console.log('Menu '+(i+1)+': OK');}
-vm.runInContext("page=1;render();lossMode='grouped';renderLossGrid()",sandbox);assert(nodes['#lossGrid'].innerHTML.includes('Perda acumulada'));
+vm.runInContext("page=0;render()",sandbox);assert(nodes['#content'].innerHTML.includes('% venda loja'));vm.runInContext("page=2;render()",sandbox);assert(nodes['#content'].innerHTML.includes('Participação na loja'));vm.runInContext("page=1;render();lossMode='grouped';renderLossGrid()",sandbox);assert(nodes['#lossGrid'].innerHTML.includes('Perda acumulada'));
 vm.runInContext("lossMode='individual';renderLossGrid()",sandbox);assert(nodes['#lossGrid'].innerHTML.includes('2026-09-27'),'Perda posterior ao corte de vendas deve aparecer');
 assert(nodes['#content'].innerHTML.includes('Aguardando vendas dos dias mais recentes'),'Percentual total não pode misturar coberturas');
 vm.runInContext("lossQuery='naoexisteprodutoabcdef';renderLossGrid()",sandbox);assert(nodes['#lossGrid'].innerHTML.includes('Nenhum lançamento'));

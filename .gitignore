@@ -1,0 +1,26 @@
+# Dados operacionais e backups nunca entram no Git.
+/data/
+/upload/
+/outputs/
+*.xlsx
+*.xls
+*.gz
+*.zip
+*.sqlite*
+*.db
+*backup*.json
+*Backup*.json
+base_conferida*.json
+Base_Analitica*.json
+auditoria*.json
+.env
+.env.*
+!.env.example
+web/config.js
+dist/
+__pycache__/
+*.py[cod]
+.venv/
+node_modules/
+.DS_Store
+Thumbs.db

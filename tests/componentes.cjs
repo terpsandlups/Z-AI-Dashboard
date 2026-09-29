@@ -1,0 +1,14 @@
+// Component generation/interaction checks without a graphical browser.
+const vm=require('vm'),fs=require('fs'),path=require('path'),assert=require('assert');const root=path.resolve(__dirname,'..');let nodes={},classes=new Set();const node=id=>nodes[id]||(nodes[id]={innerHTML:'',textContent:'',value:id==='#from'||id==='#to'?'2026-08':'',hidden:false,disabled:false,dataset:{},querySelectorAll:()=>[],addEventListener:()=>{},setAttribute:()=>{},showModal:()=>{},close:()=>{}});
+const sandbox={console,Intl,Date,Map,Set,URL,Blob,TextEncoder,setTimeout,clearTimeout,document:{querySelector:node,body:{classList:{toggle:(k,force)=>{const on=force??!classes.has(k);on?classes.add(k):classes.delete(k);return on}}}},window:{}};vm.createContext(sandbox);
+for(const f of ['core.js','app.js','ui.js']){vm.runInContext(fs.readFileSync(root+'/web/'+f,'utf8'),sandbox);if(f==='core.js')sandbox.ZAI=sandbox.window.ZAI;}
+sandbox.inputData=require('./fixture.cjs')();vm.runInContext('setData(inputData,false)',sandbox);
+for(let i=0;i<8;i++){vm.runInContext('page='+i+';render()',sandbox);assert(nodes['#content'].innerHTML.length>200);assert(!nodes['#content'].innerHTML.includes('Imprimir'));console.log('Menu '+(i+1)+': OK');}
+vm.runInContext("page=1;render();lossMode='grouped';renderLossGrid()",sandbox);assert(nodes['#lossGrid'].innerHTML.includes('Perda acumulada'));
+vm.runInContext("lossMode='individual';renderLossGrid()",sandbox);assert(nodes['#lossGrid'].innerHTML.includes('2026-09-27'),'Perda posterior ao corte de vendas deve aparecer');
+assert(nodes['#content'].innerHTML.includes('Aguardando vendas dos dias mais recentes'),'Percentual total não pode misturar coberturas');
+vm.runInContext("lossQuery='naoexisteprodutoabcdef';renderLossGrid()",sandbox);assert(nodes['#lossGrid'].innerHTML.includes('Nenhum lançamento'));
+vm.runInContext("page=7;render();cloud=true;data.papel='importador';$('#reportType').value='auditorias';$('#reportType').onchange()",sandbox);assert(nodes['#lossFile'].disabled);assert(nodes['#typeGuide'].textContent.includes('aguardando'));
+vm.runInContext("$('#reportType').value='vendas';$('#reportType').onchange()",sandbox);assert(!nodes['#lossFile'].disabled);assert(nodes['#importMode'].disabled);
+vm.runInContext("$('#sidebarToggle').onclick()",sandbox);assert(classes.has('expanded'));
+console.log('OK: geração, busca, agrupamento, tipo obrigatório, bloqueio de categorias sem layout e sidebar. Não é teste visual.');

@@ -2,6 +2,29 @@
 
 Dashboard Executivo de vendas, perdas e metas. Frontend estático em JavaScript,
 CSS e HTML; PostgreSQL/Supabase para autenticação, persistência e acesso por loja.
+## Piloto e expansão
+
+A **Loja 007 — Kalimera Japy** é a base piloto de testes. O objetivo é evoluir
+para todas as lojas, com autorização de acesso e configuração próprias por filial.
+
+- **Meta diária de vendas:** definida por loja, no campo `baseline.meta_diaria`.
+- **Meta de perdas:** percentual sobre a venda, definido conforme o comportamento
+  e a operação da loja, no campo `baseline.meta_perda`. É uma fração decimal.
+- **Realizado:** perdas reconhecidas ÷ vendas no mesmo período e escopo.
+- **Limite em reais:** vendas × percentual de meta configurado da loja.
+- **Departamentos:** podem receber metas específicas. Sem meta setorial, a
+  comparação usa a referência da própria loja; sem configuração, mostra indisponível.
+- **Regras operacionais:** devem ser validadas conforme a operação de cada unidade.
+  O sistema não deduz automaticamente a meta ideal a partir do histórico.
+
+As configurações são mantidas por loja em `montekali.configuracao_painel` e
+retornadas pelo snapshot autorizado. Nesta fase, a edição é administrativa;
+não há formulário de configuração de metas no frontend. O calendário atual usa
+os dias corridos do período coberto; calendários operacionais particulares são evolução futura.
+Os importadores históricos legados continuam específicos do piloto e precisam de
+adaptação validada antes de uso em outras lojas. A interface e as consultas já
+respeitam a filial selecionada e suas permissões.
+
 ## Estado da entrega
 
 Este repositório contém o código do painel e não contém backups,

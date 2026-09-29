@@ -1,0 +1,30 @@
+const assert=require('node:assert/strict');
+const Z=require('../web/core.js'),fixture=require('./fixture.cjs');
+const d=fixture(),c=Z.select(d,'2026-09','2026-09');
+assert.equal(c.salesTotal,1000,'Não somar mensal ao diário');
+assert.equal(c.lossTotal,30,'Comparar perdas no corte das vendas');
+assert.equal(c.lossTotalAll,70,'Preservar perdas mais recentes');
+assert.equal(c.unmatchedLossCount,1);
+assert.equal(c.lossAll.at(-1)[0],'2026-09-27');
+assert.equal(c.ratio,.03);assert.equal(c.days,21);assert.equal(c.goal,3780000);
+const w=Z.weekdays(d,c);
+assert.equal(w.reduce((s,r)=>s+r.days,0),21,'Incluir dias cobertos sem venda');
+assert.equal(w[2].mean,1000/3);
+const unknown=Z.select(d,'2026-09','2026-09','999');
+assert.equal(unknown.ratio,null);assert.equal(unknown.goal,null);
+const other=fixture();other.loja='008';other.baseline.meta_diaria=90000;
+assert.equal(Z.select(other,'2026-09','2026-09').goal,1890000);
+const row={data:'2026-09-27',sku:'100',dpto:'001',produto:'Teste',motivo:'Avaria',qtde:1,valor:3};
+assert.throws(()=>Z.validateLossImport({schema:'zai-perdas-import-v1',loja:'007',rows:[row]},other));
+assert.throws(()=>Z.validateLossImport({schema:'zai-perdas-import-v1',loja:'007',rows:[{...row,data:'2026-02-30'}]},d));
+const zero=fixture();zero.vendas_diarias_produto_mes[0][4]=0;
+assert.equal(Z.select(zero,'2026-09','2026-09').ratio,null);
+console.log('OK: cobertura, perdas recentes, metas, denominador, loja e validação.');
+
+assert.equal(Z.lossTarget(d),.024);
+other.baseline.meta_perda=.015;assert.equal(Z.lossTarget(other),.015);
+delete other.baseline.meta_perda;assert.equal(Z.lossTarget(other),null);
+other.baseline.meta_perda=0;assert.equal(Z.lossTarget(other),0);
+other.baseline.meta_perda='0.024';assert.equal(Z.lossTarget(other),null);
+
+assert.equal(Z.dailyGoal(other,'001'),90000);delete other.baseline.meta_diaria;assert.equal(Z.dailyGoal(other),null);

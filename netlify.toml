@@ -1,0 +1,10 @@
+[build]
+  command = "python3 tools/build_frontend.py"
+  publish = "dist"
+# Publicar somente web/. Nunca exponha data/, tools/ ou backups.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    X-Frame-Options = "SAMEORIGIN"

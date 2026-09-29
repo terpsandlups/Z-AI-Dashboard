@@ -32,8 +32,7 @@ planilhas, movimentos comerciais nem senha administrativa. Ele não restaura dad
 automaticamente nem comprova que as migrações já foram executadas no ambiente de produção.
 
 Menus: Resumo Executivo, Perdas Reconhecidas, Vendas, Comparativos, Auditorias,
-Perdas Consolidadas, Estoque de Trocas e Importar/Exportar. Auditorias, consolidação
-e trocas aguardam contratos de dados reais; a interface não aceita cargas nessas categorias.
+Perdas Consolidadas, Estoque de Trocas e Importar/Exportar. Auditorias, consolidação e trocas aguardam contratos de dados reais. A Central de importações já separa Perdas, Vendas, Saídas de estoque, Entradas de estoque e Trocas; somente Perdas e Vendas ficam graváveis até o primeiro layout real das demais categorias ser validado.
 
 Perdas Reconhecidas mostra todos os lançamentos da competência, mesmo depois do
 último dia com vendas completas. Nessa situação o percentual fica indisponível.
@@ -82,11 +81,10 @@ Crie `data/` localmente e use os arquivos privados já conferidos:
 `base_conferida.json`, `vendas_diarias.csv.gz` e `auditoria_vendas.json`.
 Essa pasta é ignorada pelo Git e nunca é publicada.
 
-- Histórico diário de vendas: `python tools/09_carregar_diario_historico.py`.
-  Após conferir a simulação, repita com `--commit`. Recusa sobreposição com vendas existentes.
-- Vendas futuras: `tools/07_carregar_vendas_diarias.py --help` e o modelo em `templates/`.
-- Perdas Excel: `tools/06_converter_perdas.py arquivo.xlsx`; use `--ct-medio-total`
-  somente no layout confirmado em que Ct Médio é o total da linha, sem multiplicar pela quantidade.
+- Histórico diário de vendas: `python tools/09_carregar_diario_historico.py`. Após conferir a simulação, repita com `--commit`. Recusa sobreposição com vendas existentes.
+- Atualizações de rotina: use **Importar e Exportar → Central de importações**. Perdas aceitam Excel/JSON; Vendas aceitam Excel/CSV diário e substituem somente os dias presentes no arquivo, sempre após prévia e confirmação.
+- Perdas Excel também podem ser convertidas por `tools/06_converter_perdas.py arquivo.xlsx`; no layout piloto, `Ct Médio` é tratado como total da linha.
+- Saídas de estoque, Entradas de estoque e Trocas aparecem separadas na central, porém permanecem bloqueadas até o primeiro arquivo real de cada origem ser mapeado. Trocas será modelado como saldo/posição atual, evitando somar snapshots sucessivos.
 - No painel, selecione Perdas ou Vendas antes do JSON. Substituição por dia exige
   relatório completo e conserva auditoria. A exportação analítica não substitui
   um backup completo do PostgreSQL.

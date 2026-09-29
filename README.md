@@ -32,7 +32,7 @@ planilhas, movimentos comerciais nem senha administrativa. Ele não restaura dad
 automaticamente nem comprova que as migrações já foram executadas no ambiente de produção.
 
 Menus: Resumo Executivo, Perdas Reconhecidas, Vendas, Comparativos, Auditorias,
-Perdas Consolidadas, Estoque de Trocas e Importar/Exportar. Auditorias, consolidação e trocas aguardam contratos de dados reais. A Central de importações já separa Perdas, Vendas, Saídas de estoque, Entradas de estoque e Trocas; somente Perdas e Vendas ficam graváveis até o primeiro layout real das demais categorias ser validado.
+Perdas Consolidadas, Estoque de Trocas e Importar/Exportar. A base de Auditorias e Trocas já existe no Supabase; as cargas permanecem bloqueadas até o primeiro layout real de cada relatório ser validado. A Central de importações já separa Perdas, Vendas, Saídas de estoque, Entradas de estoque e Trocas; somente Perdas e Vendas ficam graváveis até o primeiro layout real das demais categorias ser validado.
 
 Perdas Reconhecidas mostra todos os lançamentos da competência, mesmo depois do
 último dia com vendas completas. Nessa situação o percentual fica indisponível.
@@ -57,7 +57,7 @@ Backups legados precisam ser conciliados antes; podem conter somente perdas.
 ## Banco existente
 
 Preserve o banco em uso. Se a versão anterior ainda não estiver ativada, execute
-`database/03_painel_v2.sql`. Depois execute `database/08_vendas_diarias_multiloja.sql`.
+`database/03_painel_v2.sql`. Depois execute `database/08_vendas_diarias_multiloja.sql` e `database/10_auditorias_trocas.sql`.
 Crie a conta em Authentication e ajuste o UUID em `database/04_autorizar_usuario.sql`.
 As funções validam usuário, filial e papel; não há acesso anônimo aos movimentos.
 Não reexecute a criação inicial 01 nem a carga inicial 02 em um banco já preenchido.
@@ -127,3 +127,15 @@ visual em navegador nem um teste integrado com o Supabase. A validação de logi
 permissões e gravação deve ocorrer no ambiente de homologação antes da ativação.
 
 Repositório público: **terpsandlups/Z-AI-Dashboard**. Os dados operacionais ficam no Supabase e nos arquivos privados autorizados.
+
+
+## Auditorias e Trocas
+
+A migração `database/10_auditorias_trocas.sql` cria:
+
+- `montekali.auditorias_estoque`: estrutura comum para Auditoria de Entrada e Auditoria de Saída.
+- `montekali.trocas_posicao`: posição atual de trocas, sem somar snapshots antigos.
+- `montekali.trocas_snapshots`: histórico de cada posição importada.
+- Resumos autorizados no `zai_snapshot` para exibição dos KPIs.
+
+Nenhuma regra de falta/sobra é inferida automaticamente. O cálculo de Perdas Consolidadas só será ativado depois que o significado operacional das colunas de entrada e saída for confirmado com arquivos reais do ERP.

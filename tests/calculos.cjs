@@ -11,6 +11,7 @@ const w=Z.weekdays(d,c);
 assert.equal(w.reduce((s,r)=>s+r.days,0),21,'Incluir dias cobertos sem venda');
 assert.equal(w[2].mean,1000/3);
 const da=Z.departmentAnalytics(d,c);assert.equal(da.length,2);const d1=da.find(r=>r.code==='001');assert.equal(d1.sales,600);assert.equal(d1.loss,30);assert.equal(d1.ratio,.05);assert.equal(d1.salesShare,.6);assert.equal(d1.lossShare,.75);assert.equal(d1.storeLossImpact,.03);
+const inv=Z.inventoryAudit(d,'2026-09','2026-09');assert.equal(inv.sobra,20);assert.equal(inv.falta,60);assert.equal(inv.resultado,40);const cons=Z.consolidatedLoss(d,c,'2026-09','2026-09');assert.equal(cons.value,80);assert.equal(cons.ratio,.08);
 const unknown=Z.select(d,'2026-09','2026-09','999');
 assert.equal(unknown.ratio,null);assert.equal(unknown.goal,null);
 const other=fixture();other.loja='008';other.baseline.meta_diaria=90000;

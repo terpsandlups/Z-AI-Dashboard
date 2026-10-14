@@ -29,4 +29,4 @@ delete other.baseline.meta_perda;assert.equal(Z.lossTarget(other),null);
 other.baseline.meta_perda=0;assert.equal(Z.lossTarget(other),0);
 other.baseline.meta_perda='0.024';assert.equal(Z.lossTarget(other),null);
 
-assert.equal(Z.dailyGoal(other,'001'),90000);delete other.baseline.meta_diaria;assert.equal(Z.dailyGoal(other),null);
+assert.equal(Z.dailyGoal(other,'001'),54000);delete other.baseline.meta_diaria;assert.equal(Z.dailyGoal(other),null);

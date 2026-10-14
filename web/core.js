@@ -38,6 +38,23 @@ function departmentAnalytics(data,c){
   return {...r,salesShare,lossShare,storeLossImpact,shareGap};
  });
 }
+function inventoryAudit(data,from,to,dept=''){
+ const months=monthRange(from,to),rows=(data.auditorias_resumo_dia||[]).filter(r=>months.includes(String(r[0]).slice(0,7))&&(!dept||r[1]===dept));
+ let sobra=0,falta=0;const byDept=new Map();
+ for(const r of rows){
+  const code=r[1],tipo=r[2],q=Number(r[3]||0),v=Number(r[4]||0);
+  if(!byDept.has(code))byDept.set(code,{code,name:data.departamentos[code]||code,sobra:0,falta:0,qtdeSobra:0,qtdeFalta:0});
+  const x=byDept.get(code);
+  if(tipo==='entrada'){sobra+=v;x.sobra+=v;x.qtdeSobra+=q}
+  if(tipo==='saida'){falta+=v;x.falta+=v;x.qtdeFalta+=q}
+ }
+ const list=[...byDept.values()].map(x=>({...x,resultado:x.falta-x.sobra})).sort((a,b)=>Math.abs(b.resultado)-Math.abs(a.resultado));
+ return {rows,sobra,falta,resultado:falta-sobra,departments:list};
+}
+function consolidatedLoss(data,c,from,to,dept=''){
+ const audit=inventoryAudit(data,from,to,dept),recognized=Number(c.lossTotal||0),value=recognized+audit.resultado;
+ return {recognized,audit,value,ratio:c.comparable&&c.salesTotal>0?value/c.salesTotal:null};
+}
 function weekdays(data,c,dept=''){
  const out=Array.from({length:7},()=>({days:0,value:0})),covered=new Set(data.dias_vendas_completos||[]);
  for(const d of covered)if(c.months.includes(d.slice(0,7)))out[new Date(d+'T12:00:00Z').getUTCDay()].days++;
@@ -52,5 +69,5 @@ function validateLossImport(d,data){
  }
  return d.rows;
 }
-const api={dailyGoal,lossTarget,sum,days,dateList,monthRange,select,departmentRows,departmentAnalytics,weekdays,validateLossImport};root.ZAI=api;if(typeof module!=='undefined')module.exports=api;
+const api={dailyGoal,lossTarget,sum,days,dateList,monthRange,select,departmentRows,departmentAnalytics,inventoryAudit,consolidatedLoss,weekdays,validateLossImport};root.ZAI=api;if(typeof module!=='undefined')module.exports=api;
 })(typeof window==='undefined'?globalThis:window);

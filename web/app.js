@@ -143,7 +143,7 @@ function compare(){
  <article class="card"><h2>Variação por departamento</h2><p class="desc">Ordenado pelos maiores movimentos absolutos entre os dois períodos.</p>${table(['Departamento','Consolidada A','Consolidada B','Variação'],rows.map(r=>[esc(r.code+' · '+r.name),money(r.a),money(r.b),(r.delta>0?'+ ':'')+money(r.delta)]))}<div class="actions"><button id="compareCsv">Exportar comparação CSV</button></div></article>`;
 }
 function tradeCanonical(cat){return ['elas_por_elas','produto_por_produto','troca_produto'].includes(cat)?'troca_produto':(cat||'sem_cadastro')}
-function tradeLabel(cat){cat=tradeCanonical(cat);return ({nf_devolucao:'NF / Nota de devolução',troca_produto:'Troca produto por produto',bonificacao:'Bonificação',mista:'Mista · troca / NF',sem_cadastro:'Sem regra cadastrada'})[cat]||'Outra'}
+function tradeLabel(cat){cat=tradeCanonical(cat);return ({nf_devolucao:'NF / Nota de devolução',troca_produto:'Elas por elas / produto por produto',bonificacao:'Bonificação',mista:'Mista · troca / NF',sem_cadastro:'Sem regra cadastrada'})[cat]||'Outra'}
 function tradeRuleMap(){return new Map((data?.trocas_fornecedores||[]).map(x=>[String(x.fornecedor_codigo||''),{...x,categoria:tradeCanonical(x.categoria)}]))}
 function tradeCleanSupplier(name){return String(name||'').replace(/\s*\([^)]*\)\s*/g,' ').replace(/\*ativo\*/gi,'').replace(/\s+/g,' ').trim()}
 function tradeRuleBrand(rule){

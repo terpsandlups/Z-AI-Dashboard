@@ -45,4 +45,4 @@ function bindLossGrid(){
  $('#lossSearch').oninput=e=>{lossQuery=e.target.value;lossPage=0;renderLossGrid()};$('#lossReason').onchange=e=>{lossReason=e.target.value;lossPage=0;renderLossGrid()};$('#lossStatus').onchange=e=>{lossStatus=e.target.value;lossPage=0;renderLossGrid()};
  $('#lossExport').onclick=()=>{const rows=lossRows();csv('perdas_'+activeStore+'_'+lossMode+'.csv',lossMode==='individual'?['Loja','Data','SKU','Produto','Departamento','Motivo','Quantidade origem','Valor']:['Loja','SKU','Produto','Departamento','Ocorrências','Dias','Quantidade origem','Valor'],rows.map(r=>lossMode==='individual'?[activeStore,r.data,r.sku,r.produto,r.departamento,r.motivo,String(r.qtde).replace('.',','),r.valor.toFixed(2).replace('.',',')]:[activeStore,r.sku,r.produto,r.departamento,r.ocorrencias,r.dias,String(r.qtde).replace('.',','),r.valor.toFixed(2).replace('.',',')]))};
 }
-render();syncStores();$('#login').showModal();
+render();syncStores();if(!$('#login').open)$('#login').showModal();

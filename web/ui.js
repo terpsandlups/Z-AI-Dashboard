@@ -1,5 +1,6 @@
 /* Shared shell and operational components. Data/metrics remain in app.js/core.js. */
 let lossMode='individual',lossQuery='',lossReason='',lossStatus='',lossPage=0,lossSort='valor',lossDirection=-1;
+let auditMode='agrupado',auditType='',auditQuery='',auditPage=0,auditData=null,auditLoadedKey='',auditLoading=false,auditSearchTimer=null;
 function syncStores(){
  const stores=cloud?accessibleStores:(data?[{codigo:data.loja,nome:data.nome}]:[]);
  $('#storeSelect').innerHTML=stores.length?stores.map(s=>`<option value="${esc(s.codigo)}">${esc(s.codigo+' · '+s.nome)}</option>`).join(''):'<option value="">Selecione a loja</option>';
@@ -26,7 +27,7 @@ async function refresh(){
  }catch(e){if(version===requestVersion){data=null;cloud=false;render();$('#sourceBadge').textContent=session?'Autenticado · falha ao carregar':'Não conectado';$('#loginOpen').textContent=session?'Conta conectada':'Entrar';$('#logout').hidden=!session;msg(e.message,true);}}
 }
 $('#refresh').onclick=refresh;
-$('#storeSelect').onchange=async e=>{const next=e.target.value;if(!next||next===activeStore)return;activeStore=next;data=null;pending=null;context=null;lossPage=0;lossQuery='';lossReason='';lossStatus='';productQuery='';productStatus='';render();await refresh()};
+$('#storeSelect').onchange=async e=>{const next=e.target.value;if(!next||next===activeStore)return;activeStore=next;data=null;pending=null;context=null;lossPage=0;lossQuery='';lossReason='';lossStatus='';productQuery='';productStatus='';auditPage=0;auditQuery='';auditType='';auditData=null;auditLoadedKey='';render();await refresh()};
 $('#sidebarToggle').onclick=()=>{const expanded=document.body.classList.toggle('expanded');document.body.classList.toggle('rail',!expanded);$('#sidebarToggle').setAttribute('aria-expanded',String(expanded));$('#sidebarToggle').setAttribute('aria-label',expanded?'Recolher navegação':'Expandir navegação')};
 function losses(){
  const c={...context,loss:context.lossAll,lossTotal:context.lossTotalAll,ratio:context.unmatchedLossCount?null:context.ratio},meta=ZAI.lossTarget(data),goal=$('#dept').value?(data.metas||[]).find(x=>x.codigo===$('#dept').value)?.meta_perda:null,target=goal??meta;
@@ -52,4 +53,104 @@ function bindLossGrid(){
  $('#lossSearch').oninput=e=>{lossQuery=e.target.value;lossPage=0;renderLossGrid()};$('#lossReason').onchange=e=>{lossReason=e.target.value;lossPage=0;renderLossGrid()};$('#lossStatus').onchange=e=>{lossStatus=e.target.value;lossPage=0;renderLossGrid()};
  $('#lossExport').onclick=()=>{const rows=lossRows();csv('perdas_'+activeStore+'_'+lossMode+'.csv',lossMode==='individual'?['Loja','Data','SKU','Produto','Departamento','Motivo','Quantidade origem','Valor']:['Loja','SKU','Produto','Departamento','Ocorrências','Dias','Quantidade origem','Valor'],rows.map(r=>lossMode==='individual'?[activeStore,r.data,r.sku,r.produto,r.departamento,r.motivo,String(r.qtde).replace('.',','),r.valor.toFixed(2).replace('.',',')]:[activeStore,r.sku,r.produto,r.departamento,r.ocorrencias,r.dias,String(r.qtde).replace('.',','),r.valor.toFixed(2).replace('.',',')]))};
 }
+function auditRequestKey(){
+ if(!data)return '';
+ return [activeStore,$('#from')?.value||'',$('#to')?.value||'',$('#dept')?.value||'',auditType,auditQuery.trim(),auditMode,auditPage].join('|');
+}
+function auditFallback(){
+ const op=operationalPeriod($('#from').value,$('#to').value,$('#dept').value),a=op.a;
+ return {resumo:{registros:a.rows.length,skus:0,dias:new Set(a.rows.map(r=>r[0])).size,faltas:a.faltas,sobras:a.sobras,liquido:a.liquido,qtde_falta:a.qf,qtde_sobra:a.qs},top_faltas:[],top_sobras:[],departamentos:[],linhas:[],total_linhas:0};
+}
+function audits(){
+ const key=auditRequestKey(),fresh=auditData&&auditLoadedKey===key,d=fresh?auditData:auditFallback(),r=d.resumo||{},op=operationalPeriod($('#from').value,$('#to').value,$('#dept').value),ratio=op.context.comparable&&op.context.salesTotal>0?Number(r.liquido||0)/op.context.salesTotal:null;
+ const topF=(d.top_faltas||[]).map(x=>[x.produto+' · '+x.sku,Number(x.valor||0),money(Number(x.valor||0))]);
+ const topS=(d.top_sobras||[]).map(x=>[x.produto+' · '+x.sku,Number(x.valor||0),money(Number(x.valor||0))]);
+ const deptRows=(d.departamentos||[]).map(x=>[esc((x.dpto||'')+' · '+(x.departamento||'')),money(Number(x.faltas||0)),money(Number(x.sobras||0)),money(Number(x.liquido||0))]);
+ return `<div class="kpis">
+   ${card('Faltas de estoque',money(Number(r.faltas||0)),num(Number(r.qtde_falta||0))+' em quantidade',true)}
+   ${card('Sobras de estoque',money(Number(r.sobras||0)),num(Number(r.qtde_sobra||0))+' em quantidade')}
+   ${card('Resultado líquido do inventário',money(Number(r.liquido||0)),'Faltas − Sobras')}
+   ${card('Resultado líquido / venda',ratio==null?'—':pct(ratio),'Mesmo período e departamento')}
+   ${card('SKUs auditados',fresh?num(Number(r.skus||0)):'—',fresh?num(Number(r.registros||0))+' movimentos':'Carregando detalhe…')}
+  </div>
+  <div class="grid2 losses-charts">
+   <article class="card"><div class="section-title compact"><div><span class="section-kicker">FALTAS</span><h2>Principais itens acumulados</h2></div></div>${fresh?bars(topF,true):'<div class="loading-state">Carregando principais faltas…</div>'}</article>
+   <article class="card"><div class="section-title compact"><div><span class="section-kicker">SOBRAS</span><h2>Principais itens acumulados</h2></div></div>${fresh?bars(topS,false):'<div class="loading-state">Carregando principais sobras…</div>'}</article>
+  </div>
+  <article class="card table-section"><div class="section-title compact"><div><span class="section-kicker">DEPARTAMENTOS</span><h2>Resultado de auditoria por departamento</h2></div></div>
+   <p class="desc">Mostra separadamente faltas e sobras. Resultado líquido = faltas − sobras.</p>
+   ${fresh?table(['Departamento','Faltas','Sobras','Resultado líquido'],deptRows):'<div class="loading-state">Carregando departamentos…</div>'}
+  </article>
+  <article class="card grid-card">
+   <div class="section-title"><div><span class="section-kicker">DETALHAMENTO</span><h2>Movimentos de auditoria</h2></div>
+    <div class="actions"><button id="auditIndividual" class="${auditMode==='individual'?'primary':''}">Individual</button><button id="auditGrouped" class="${auditMode==='agrupado'?'primary':''}">Agrupado por SKU</button><button id="auditExport">↓ CSV</button></div>
+   </div>
+   <div class="searchrow">
+    <input id="auditSearch" placeholder="Buscar SKU, produto ou departamento" value="${esc(auditQuery)}">
+    <select id="auditType"><option value="">Sobras e faltas</option><option value="saida" ${auditType==='saida'?'selected':''}>Somente faltas</option><option value="entrada" ${auditType==='entrada'?'selected':''}>Somente sobras</option></select>
+   </div>
+   <div id="auditGrid">${auditGridHtml(fresh?d:null)}</div>
+   <p class="small muted">Saída de estoque = falta. Entrada de estoque = sobra. O modo agrupado consolida recorrências do mesmo SKU/departamento no período.</p>
+  </article>`;
+}
+function auditGridHtml(d){
+ if(auditLoading&&!d)return '<div class="loading-state">Carregando auditorias do período…</div>';
+ if(!d)return '<div class="loading-state">Carregando auditorias do período…</div>';
+ const rows=d.linhas||[],total=Number(d.total_linhas||0),size=50,pages=Math.max(1,Math.ceil(total/size)),pageNow=Math.min(auditPage,pages-1);
+ if(auditMode==='individual'){
+  const body=rows.map(r=>`<tr><td>${esc(r.data||'')}</td><td>${r.tipo==='saida'?'<span class="tag bad">Falta</span>':'<span class="tag good">Sobra</span>'}</td><td>${esc(r.sku||'')}</td><td>${esc(r.produto||'')}</td><td>${esc(r.departamento||r.dpto||'')}</td><td class="num">${num(Number(r.quantidade||0))}</td><td class="num">${money(Number(r.valor||0))}</td><td class="num">${r.tipo==='saida'?money(Number(r.valor||0)):'− '+money(Number(r.valor||0))}</td></tr>`).join('');
+  return `<div class="grid-summary">${num(total)} movimentos<b>${money(Number(d.resumo?.liquido||0))} líquido</b></div><div class="table-wrap"><table class="data-grid"><thead><tr><th>Data</th><th>Tipo</th><th>SKU</th><th>Produto</th><th>Departamento</th><th class="num">Qtde</th><th class="num">Valor</th><th class="num">Impacto</th></tr></thead><tbody>${body||'<tr><td colspan="8">Nenhum movimento neste filtro.</td></tr>'}</tbody></table></div>${auditPager(pageNow,pages,total)}`;
+ }
+ const body=rows.map(r=>`<tr><td>${esc(r.sku||'')}</td><td>${esc(r.produto||'')}</td><td>${esc(r.departamento||r.dpto||'')}</td><td class="num">${num(Number(r.ocorrencias||0))}</td><td class="num">${num(Number(r.dias||0))}</td><td class="num">${money(Number(r.faltas||0))}</td><td class="num">${money(Number(r.sobras||0))}</td><td class="num">${money(Number(r.liquido||0))}</td></tr>`).join('');
+ return `<div class="grid-summary">${num(total)} produtos/departamentos<b>${money(Number(d.resumo?.liquido||0))} líquido</b></div><div class="table-wrap"><table class="data-grid"><thead><tr><th>SKU</th><th>Produto</th><th>Departamento</th><th class="num">Ocorrências</th><th class="num">Dias</th><th class="num">Faltas</th><th class="num">Sobras</th><th class="num">Resultado líquido</th></tr></thead><tbody>${body||'<tr><td colspan="8">Nenhum item neste filtro.</td></tr>'}</tbody></table></div>${auditPager(pageNow,pages,total)}`;
+}
+function auditPager(pageNow,pages,total){
+ return `<div class="grid-pager"><span>Página ${pageNow+1} de ${pages} · ${num(total)} resultados</span><div><button id="auditPrev" ${pageNow===0?'disabled':''}>←</button><button id="auditNext" ${pageNow>=pages-1?'disabled':''}>→</button></div></div>`;
+}
+async function loadAuditData(force=false){
+ if(!data||page!==4)return;
+ const key=auditRequestKey();
+ if(!cloud){auditData=auditFallback();auditLoadedKey=key;auditLoading=false;renderAuditGridOnly();return}
+ if(!force&&auditLoadedKey===key&&auditData){renderAuditGridOnly();return}
+ auditLoading=true;renderAuditGridOnly();
+ try{
+  const r=await request('/rest/v1/rpc/zai_auditorias_periodo',{
+   p_loja:activeStore,p_de:$('#from').value,p_ate:$('#to').value,p_dpto:$('#dept').value||null,
+   p_tipo:auditType||null,p_busca:auditQuery.trim()||null,p_modo:auditMode,p_limit:50,p_offset:auditPage*50
+  });
+  if(page!==4||key!==auditRequestKey())return;
+  auditData=r;auditLoadedKey=key;
+ }catch(e){msg('Auditorias: '+e.message,true);auditData=null;auditLoadedKey='';}
+ finally{auditLoading=false;if(page===4)render();}
+}
+function renderAuditGridOnly(){if($('#auditGrid'))$('#auditGrid').innerHTML=auditGridHtml(auditData&&auditLoadedKey===auditRequestKey()?auditData:null)}
+async function exportAuditCsv(){
+ try{
+  msg('Preparando CSV de auditorias…');
+  const r=await request('/rest/v1/rpc/zai_auditorias_periodo',{
+   p_loja:activeStore,p_de:$('#from').value,p_ate:$('#to').value,p_dpto:$('#dept').value||null,
+   p_tipo:auditType||null,p_busca:auditQuery.trim()||null,p_modo:auditMode,p_limit:50000,p_offset:0
+  }),rows=r.linhas||[];
+  if(auditMode==='individual'){
+   csv('auditorias_'+activeStore+'_individual.csv',['Loja','Data','Tipo','SKU','Produto','Departamento','Quantidade','Valor','Impacto líquido','Documento','Observação'],rows.map(x=>[activeStore,x.data,x.tipo==='saida'?'Falta':'Sobra',x.sku,x.produto,x.departamento,String(x.quantidade??0).replace('.',','),Number(x.valor||0).toFixed(2).replace('.',','),(x.tipo==='saida'?Number(x.valor||0):-Number(x.valor||0)).toFixed(2).replace('.',','),x.documento||'',x.observacao||'']));
+  }else{
+   csv('auditorias_'+activeStore+'_agrupado.csv',['Loja','SKU','Produto','Departamento','Ocorrências','Dias','Qtde falta','Qtde sobra','Faltas R
+,'Sobras R
+,'Resultado líquido R
+],rows.map(x=>[activeStore,x.sku,x.produto,x.departamento,x.ocorrencias,x.dias,String(x.qtde_falta??0).replace('.',','),String(x.qtde_sobra??0).replace('.',','),Number(x.faltas||0).toFixed(2).replace('.',','),Number(x.sobras||0).toFixed(2).replace('.',','),Number(x.liquido||0).toFixed(2).replace('.',',')]));
+  }
+  msg('CSV de auditorias preparado com '+num(rows.length)+' linhas.');
+ }catch(e){msg('Não foi possível exportar auditorias: '+e.message,true)}
+}
+function bindAuditPage(){
+ $('#auditIndividual').onclick=()=>{auditMode='individual';auditPage=0;auditData=null;auditLoadedKey='';render()};
+ $('#auditGrouped').onclick=()=>{auditMode='agrupado';auditPage=0;auditData=null;auditLoadedKey='';render()};
+ $('#auditType').onchange=e=>{auditType=e.target.value;auditPage=0;auditData=null;auditLoadedKey='';render()};
+ $('#auditSearch').oninput=e=>{auditQuery=e.target.value;auditPage=0;auditData=null;auditLoadedKey='';clearTimeout(auditSearchTimer);auditSearchTimer=setTimeout(()=>{if(page===4)loadAuditData(true)},350)};
+ $('#auditExport').onclick=exportAuditCsv;
+ if($('#auditPrev'))$('#auditPrev').onclick=()=>{auditPage=Math.max(0,auditPage-1);auditData=null;auditLoadedKey='';render()};
+ if($('#auditNext'))$('#auditNext').onclick=()=>{auditPage++;auditData=null;auditLoadedKey='';render()};
+ loadAuditData();
+}
+
 render();syncStores();if(!$('#login').open)$('#login').showModal();

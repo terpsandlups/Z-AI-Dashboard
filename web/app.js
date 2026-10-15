@@ -308,5 +308,46 @@ async function previewAudit(file,type){pending=null;try{const p=await parseAudit
 async function previewTrocas(file){pending=null;try{const p=await parseTrocasFile(file),hash=await hashFile(file),total=p.rows.reduce((s,r)=>s+r.valor,0),qty=p.rows.reduce((s,r)=>s+r.quantidade,0);pending={type:'trocas',rows:p.rows,date:p.date,hash,file:file.name,revision:data.revision};$('#importPreview').innerHTML=`<div class="notice"><b>Posição atual de Trocas · ${esc(p.date)}</b><br>${num(p.rows.length)} SKUs · ${num(qty)} unidades/kg · ${money(total)}<br><b>A posição anterior inteira será substituída.</b> O snapshot anterior ficará apenas no histórico.</div><label style="display:block"><input type="checkbox" id="confirmCheck"> Confirmo que este arquivo representa a posição completa de trocas desta data.</label><div class="actions"><button class="primary" id="commitImport">Confirmar substituição da posição</button></div>`;$('#commitImport').onclick=commitImport;}catch(e){msg(e.message,true);$('#importPreview').innerHTML=''}}
 async function commitImport(){if(!pending||!$('#confirmCheck')?.checked){msg('Confira a prévia e marque a confirmação antes de gravar.',true);return}const p=pending,b=$('#commitImport');b.disabled=true;try{if(p.type==='perdas'){const r=await request('/rest/v1/rpc/zai_importar_perdas',{p_loja:activeStore,p_revision:p.revision,p_hash:p.hash,p_arquivo:p.file,p_modo:p.mode,p_linhas:p.rows});pending=null;await refresh();msg('Perdas gravadas no Supabase: '+num(r.registros)+' registros, '+money(Number(r.valor))+'.');return}if(p.type==='auditoria'){const r=await request('/rest/v1/rpc/zai_importar_auditoria',{p_loja:activeStore,p_revision:p.revision,p_hash:p.hash,p_arquivo:p.file,p_tipo:p.auditType,p_linhas:p.rows,p_datas:p.dates});pending=null;await refresh();msg((p.auditType==='entrada'?'Sobras':'Faltas')+' gravadas: '+num(r.registros)+' registros, '+money(Number(r.valor))+'.');return}if(p.type==='trocas'){const r=await request('/rest/v1/rpc/zai_importar_trocas',{p_loja:activeStore,p_revision:p.revision,p_hash:p.hash,p_arquivo:p.file,p_data_referencia:p.date,p_linhas:p.rows});pending=null;await refresh();msg('Posição de trocas substituída: '+num(r.registros)+' SKUs, '+money(Number(r.valor))+'.');return}if(p.type==='vendas'){let totalRows=0,totalValue=0;for(let i=0;i<p.batches.length;i++){const x=p.batches[i],h=await chunkHash(p.hash,x.dates);$('#importPreview').insertAdjacentHTML('beforeend','<p class="small">Gravando lote '+(i+1)+' / '+p.batches.length+' · '+esc(x.dates[0])+' a '+esc(x.dates.at(-1))+'…</p>');const r=await request('/rest/v1/rpc/zai_importar_vendas',{p_loja:activeStore,p_revision:p.revision+i,p_hash:h,p_arquivo:p.file+' · lote '+(i+1)+'/'+p.batches.length,p_linhas:x.rows,p_datas:x.dates});totalRows+=Number(r.registros||0);totalValue+=Number(r.valor||0)}pending=null;await refresh();msg('Vendas gravadas no Supabase: '+num(totalRows)+' registros consolidados, '+money(totalValue)+'.');return}throw Error('Tipo de importação ainda não habilitado.')}catch(e){msg('Importação interrompida: '+e.message+' Atualize o painel antes de repetir; lotes já confirmados permanecem gravados.',true);if($('#commitImport'))$('#commitImport').disabled=false}}
 
-$('#loginOpen').onclick=()=>$('#login').showModal();$('#loginClose').onclick=()=>$('#login').close();$('#loginForm').onsubmit=async e=>{e.preventDefault();$('#loginError').textContent='Conectando…';try{const r=await request('/auth/v1/token?grant_type=password',{email:$('#email').value,password:$('#password').value},false);session={...r,expires_at:Date.now()/1000+r.expires_in};$('#password').value='';$('#loginError').textContent='';$('#login').close();await refresh();}catch(e){$('#loginError').textContent=e.message}};
+let recoveryToken='';
+function loginMode(mode){
+ const recovery=mode==='recovery';
+ $('#email').closest('label').hidden=recovery;$('#password').closest('label').hidden=recovery;$('#loginSubmit').hidden=recovery;$('#forgotPassword').hidden=recovery;
+ $('#recoveryBox').hidden=!recovery;$('#loginClose').hidden=recovery;
+ $('#loginError').textContent='';$('#recoveryMessage').textContent='';
+ if(recovery){$('#login').showModal();setTimeout(()=>$('#newPassword').focus(),0)}
+}
+async function sendPasswordRecovery(){
+ const email=$('#email').value.trim();
+ if(!email)return $('#loginError').textContent='Informe o e-mail cadastrado.';
+ if(!BASE||!KEY)return $('#loginError').textContent='Configuração do Supabase indisponível.';
+ $('#loginError').textContent='Enviando e-mail de recuperação…';
+ try{
+  const redirectTo=location.origin+location.pathname;
+  const r=await fetch(BASE+'/auth/v1/recover?redirect_to='+encodeURIComponent(redirectTo),{method:'POST',headers:{apikey:KEY,'Content-Type':'application/json'},body:JSON.stringify({email})});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok)throw Error(j.msg||j.message||j.error_description||'Não foi possível enviar o e-mail.');
+  $('#loginError').textContent='E-mail enviado. Abra a mensagem de recuperação e clique no link para criar uma nova senha.';
+ }catch(e){$('#loginError').textContent=e.message}
+}
+async function saveRecoveredPassword(){
+ const p=$('#newPassword').value,c=$('#confirmNewPassword').value;
+ if(p.length<8)return $('#recoveryMessage').textContent='Use uma senha com pelo menos 8 caracteres.';
+ if(p!==c)return $('#recoveryMessage').textContent='As duas senhas não são iguais.';
+ if(!recoveryToken)return $('#recoveryMessage').textContent='Link de recuperação inválido ou expirado. Solicite um novo e-mail.';
+ $('#recoveryMessage').textContent='Salvando nova senha…';
+ try{
+  const r=await fetch(BASE+'/auth/v1/user',{method:'PUT',headers:{apikey:KEY,Authorization:'Bearer '+recoveryToken,'Content-Type':'application/json'},body:JSON.stringify({password:p})});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok)throw Error(j.msg||j.message||j.error_description||'Não foi possível alterar a senha.');
+  recoveryToken='';history.replaceState(null,'',location.pathname+location.search);$('#newPassword').value='';$('#confirmNewPassword').value='';
+  loginMode('login');$('#loginError').textContent='Senha alterada com sucesso. Entre com a nova senha.';
+ }catch(e){$('#recoveryMessage').textContent=e.message}
+}
+function initPasswordRecovery(){
+ if(typeof location==='undefined')return;
+ const p=new URLSearchParams(location.hash.replace(/^#/,''));
+ if(p.get('type')==='recovery'&&p.get('access_token')){recoveryToken=p.get('access_token');loginMode('recovery')}
+}
+$('#loginOpen').onclick=()=>{loginMode('login');$('#login').showModal()};$('#loginClose').onclick=()=>$('#login').close();$('#forgotPassword').onclick=sendPasswordRecovery;$('#saveNewPassword').onclick=saveRecoveredPassword;$('#cancelRecovery').onclick=()=>loginMode('login');$('#loginForm').onsubmit=async e=>{e.preventDefault();$('#loginError').textContent='Conectando…';try{const r=await request('/auth/v1/token?grant_type=password',{email:$('#email').value,password:$('#password').value},false);session={...r,expires_at:Date.now()/1000+r.expires_in};$('#password').value='';$('#loginError').textContent='';$('#login').close();await refresh();}catch(e){$('#loginError').textContent=e.message}};
+initPasswordRecovery();
 $('#logout').onclick=async()=>{if(session)fetch(BASE+'/auth/v1/logout',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+session.access_token}}).catch(()=>{});requestVersion++;session=null;data=null;cloud=false;context=null;pending=null;activeStore='';accessibleStores=[];syncStores();$('#logout').hidden=true;$('#refresh').hidden=true;$('#sourceBadge').textContent='Sessão encerrada';$('#loginOpen').textContent='Conectar Supabase';msg('');render()};$('#refresh').onclick=()=>refresh();$('#apply').onclick=()=>{productPage=0;render()};

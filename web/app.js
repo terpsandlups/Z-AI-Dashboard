@@ -344,6 +344,7 @@ async function saveRecoveredPassword(){
  }catch(e){$('#recoveryMessage').textContent=e.message}
 }
 function initPasswordRecovery(){
+ if(typeof location==='undefined')return;
  const p=new URLSearchParams(location.hash.replace(/^#/,''));
  if(p.get('type')==='recovery'&&p.get('access_token')){recoveryToken=p.get('access_token');loginMode('recovery')}
 }

@@ -9,5 +9,5 @@ module.exports=()=>({
  dias_vendas_completos:Array.from({length:21},(_,i)=>'2026-09-'+String(i+1).padStart(2,'0')),
  vendas_mensais:[['2026-09','100','001',99,99999]],
  vendas_diarias:[],vendas_diarias_resumo:[['2026-09-01','001',600],['2026-09-01','002',400]],
- vendas_diarias_produto_mes:[['2026-09','100','001',6,600],['2026-09','200','002',4,400]],historico:[]
+ vendas_diarias_produto_mes:[['2026-09','100','001',6,600],['2026-09','200','002',4,400]],auditorias_diarias_resumo:[['2026-09-01','entrada','001',1,20],['2026-09-01','saida','001',1,70],['2026-09-01','entrada','002',1,30],['2026-09-01','saida','002',1,30]],trocas_resumo:{registros:2,quantidade:3,valor:50,data_referencia:'2026-09-21',fornecedores:1},historico:[]
 });

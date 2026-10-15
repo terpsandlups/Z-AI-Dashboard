@@ -139,3 +139,18 @@ A migração `database/10_auditorias_trocas.sql` cria:
 - Resumos autorizados no `zai_snapshot` para exibição dos KPIs.
 
 Nenhuma regra de falta/sobra é inferida automaticamente. O cálculo de Perdas Consolidadas só será ativado depois que o significado operacional das colunas de entrada e saída for confirmado com arquivos reais do ERP.
+
+
+## Formatos operacionais oficiais do ERP
+
+A partir de outubro/2026, a Central de Importações aceita diretamente os formatos usados pela Loja 007:
+
+- **Vendas:** relatório horizontal por produto, com blocos diários `Vendas | Quantidade | Ct Empresa`. Para analytics são usados Vendas e Quantidade; Ct Empresa não entra no faturamento.
+- **Perdas reconhecidas:** Excel operacional ou backup JSON `kalimera-pp-007-v1`. O backup completo deve usar substituição dos dias presentes.
+- **Auditoria de Entrada:** `Auditorias Entradas Estoque 1` = **SOBRA de estoque**.
+- **Auditoria de Saída:** `Auditorias Saidas De Estoque 1` = **FALTA de estoque**.
+- **Resultado líquido de inventário:** `Faltas - Sobras`.
+- **Perda consolidada:** `Quebras reconhecidas + Faltas - Sobras`.
+- **Trocas:** posição de estoque; cada arquivo substitui integralmente a posição anterior. O snapshot anterior é mantido somente para auditoria/histórico.
+
+A data de referência de Trocas é lida do nome do arquivo no padrão `trocas DD-MM.xlsx`.

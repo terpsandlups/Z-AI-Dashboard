@@ -1,46 +1,5 @@
 BEGIN;
 
-CREATE TABLE IF NOT EXISTS montekali.trocas_regras_fornecedor (
-  loja_codigo text NOT NULL REFERENCES montekali.lojas(codigo),
-  fornecedor_origem text NOT NULL,
-  fornecedor_grupo text NOT NULL,
-  marca_padrao text,
-  modalidade text NOT NULL DEFAULT 'Não definido'
-    CHECK (modalidade IN (
-      'Não definido',
-      'Descarte',
-      'Motorista retira',
-      'Vendedor retira',
-      'Nota de devolução',
-      'Elas por elas'
-    )),
-  observacao text,
-  atualizado_em timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (loja_codigo,fornecedor_origem)
-);
-
-ALTER TABLE montekali.trocas_regras_fornecedor ENABLE ROW LEVEL SECURITY;
-REVOKE ALL ON montekali.trocas_regras_fornecedor FROM PUBLIC,anon,authenticated;
-
-INSERT INTO montekali.trocas_regras_fornecedor
-  (loja_codigo,fornecedor_origem,fornecedor_grupo,marca_padrao,modalidade,observacao)
-VALUES
-  ('007','Seara ( Ativo )','Seara',NULL,'Descarte','Regra operacional informada pelo usuário'),
-  ('007','Seara ( Acougue)','Seara',NULL,'Descarte','Regra operacional informada pelo usuário'),
-  ('007','Itambe - Ativo','Itambé','Itambé','Descarte','Regra operacional informada pelo usuário'),
-  ('007','Itambe Minas Com e Distrib De Alim Ativo Lojas','Itambé','Itambé','Descarte','Regra operacional informada pelo usuário'),
-  ('007','Palmerin','Palmerin',NULL,'Motorista retira','Regra operacional informada pelo usuário'),
-  ('007','Delicia Da Roca','Delícias da Roça','Delícias da Roça','Motorista retira','Regra operacional informada pelo usuário'),
-  ('007','Nsa Distribuidora (yakult)','NSA Distribuidora','Yakult','Vendedor retira','Regra operacional informada pelo usuário'),
-  ('007','Serramar','Serramar','Serramar','Motorista retira','Regra operacional informada pelo usuário'),
-  ('007','Campobom Ltda','Campobom','Life','Vendedor retira','Marca Life inferida dos itens atuais; validar caso Campobom distribua outras marcas')
-ON CONFLICT (loja_codigo,fornecedor_origem) DO UPDATE SET
-  fornecedor_grupo=excluded.fornecedor_grupo,
-  marca_padrao=excluded.marca_padrao,
-  modalidade=excluded.modalidade,
-  observacao=excluded.observacao,
-  atualizado_em=now();
-
 CREATE OR REPLACE FUNCTION public.zai_trocas(p_loja text DEFAULT '007')
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -63,50 +22,92 @@ BEGIN
       t.departamento_codigo AS dpto,
       d.descricao AS departamento,
       t.fornecedor AS fornecedor_origem,
-      COALESCE(r.fornecedor_grupo,t.fornecedor,'Sem fornecedor') AS fornecedor,
+      COALESCE(r.grupo_exibicao,r.fornecedor_referencia,t.fornecedor,'Sem fornecedor') AS fornecedor,
       CASE
+        WHEN p.descricao ILIKE '%Ruffles%' THEN 'Ruffles'
+        WHEN p.descricao ILIKE '%Cheetos%' THEN 'Cheetos'
+        WHEN p.descricao ILIKE '%Tostitos%' THEN 'Tostitos'
+        WHEN p.descricao ILIKE '%Fandangos%' THEN 'Fandangos'
+        WHEN p.descricao ILIKE '%Lays%' THEN 'Lays'
+        WHEN p.descricao ILIKE '%Baconzitos%' THEN 'Baconzitos'
+        WHEN p.descricao ILIKE '%Torcida%' THEN 'Torcida'
+        WHEN p.descricao ILIKE '%Frimesa%' THEN 'Frimesa'
+        WHEN p.descricao ILIKE '%Verde Campo%' THEN 'Verde Campo'
+        WHEN p.descricao ILIKE '%Frutap%' THEN 'Frutap'
+        WHEN p.descricao ILIKE '%Xando%' THEN 'Xandô'
+        WHEN p.descricao ILIKE '%Porto Alegre%' THEN 'Porto Alegre'
+        WHEN p.descricao ILIKE '%Nestle%' THEN 'Nestlé'
+        WHEN p.descricao ILIKE '%Panco%' THEN 'Panco'
+        WHEN p.descricao ILIKE '%Prats%' THEN 'Prats'
+        WHEN p.descricao ILIKE '%Mezzani%' THEN 'Mezzani'
+        WHEN p.descricao ILIKE '%Massabor%' THEN 'Massabor'
+        WHEN p.descricao ILIKE '%Massa Da Feira%' THEN 'Massa da Feira'
         WHEN p.descricao ILIKE '%Massaleve%' THEN 'Massaleve'
         WHEN p.descricao ILIKE '%Seara%' THEN 'Seara'
         WHEN p.descricao ILIKE '%Itambe%' THEN 'Itambé'
         WHEN p.descricao ILIKE '%Yakult%' THEN 'Yakult'
         WHEN p.descricao ILIKE '%Serramar%' THEN 'Serramar'
-        WHEN p.descricao ILIKE '%Delicia%Roca%' THEN 'Delícias da Roça'
+        WHEN p.descricao ILIKE '%Delicia%Roca%' THEN 'Delícia da Roça'
         WHEN p.descricao ILIKE '% Life %' THEN 'Life'
         WHEN p.descricao ILIKE '% Kim %' THEN 'Kim'
-        WHEN p.descricao ILIKE '%Frimesa%' THEN 'Frimesa'
-        WHEN p.descricao ILIKE '%Verde Campo%' THEN 'Verde Campo'
-        WHEN p.descricao ILIKE '%Frutap%' THEN 'Frutap'
-        WHEN p.descricao ILIKE '%Xando%' THEN 'Xandô'
-        WHEN p.descricao ILIKE '%Nestle%' THEN 'Nestlé'
-        WHEN p.descricao ILIKE '%Panco%' THEN 'Panco'
-        WHEN p.descricao ILIKE '%Prats%' THEN 'Prats'
-        WHEN p.descricao ILIKE '%Mezzani%' THEN 'Mezzani'
-        ELSE COALESCE(r.marca_padrao,r.fornecedor_grupo,t.fornecedor,'Não cadastrada')
+        WHEN p.descricao ILIKE '%Catupiry%' THEN 'Catupiry'
+        WHEN p.descricao ILIKE '%Jamava%' THEN 'Jamava'
+        ELSE COALESCE(
+          CASE
+            WHEN r.marca_produto IS NULL
+              OR r.marca_produto ILIKE '%/%'
+              OR lower(r.marca_produto) IN ('toda linha','iogurtes','somente iogurtes')
+            THEN NULL
+            ELSE r.marca_produto
+          END,
+          r.grupo_exibicao,
+          t.fornecedor,
+          'Não cadastrada'
+        )
       END AS marca,
-      COALESCE(r.modalidade,'Não definido') AS modalidade,
+      COALESCE(r.tratativa,'Regra não cadastrada') AS tratativa,
+      CASE COALESCE(r.categoria,'')
+        WHEN 'nf_devolucao' THEN 'Nota de devolução'
+        WHEN 'troca_produto' THEN 'Elas por elas / Produto por produto'
+        WHEN 'bonificacao' THEN 'Bonificação'
+        WHEN 'mista' THEN 'Mista'
+        ELSE 'Não definido'
+      END AS categoria,
+      COALESCE(r.forma,'') AS forma,
+      COALESCE(r.fisico_virtual,'') AS fisico_virtual,
       t.quantidade,
       t.valor,
       t.data_referencia,
       COALESCE(t.dados_origem->>'codigo_barras',t.dados_origem->>'ean','') AS ean,
       COALESCE(t.dados_origem->>'curva','') AS curva,
-      COALESCE(t.dados_origem->>'fornecedor_codigo','') AS fornecedor_codigo
+      COALESCE(t.dados_origem->>'fornecedor_codigo','') AS fornecedor_codigo,
+      (r.fornecedor_codigo IS NULL) AS regra_ausente,
+      (
+        r.fornecedor_codigo IS NULL OR
+        (r.forma IS NULL AND COALESCE(r.fisico_virtual,'') NOT ILIKE 'Descart%')
+      ) AS regra_incompleta
     FROM montekali.trocas_posicao t
     LEFT JOIN montekali.produtos p ON p.sku=t.sku
     LEFT JOIN montekali.departamentos d ON d.codigo=t.departamento_codigo
     LEFT JOIN montekali.trocas_regras_fornecedor r
-      ON r.loja_codigo=t.loja_codigo AND r.fornecedor_origem=t.fornecedor
+      ON r.fornecedor_codigo=COALESCE(t.dados_origem->>'fornecedor_codigo','')
+     AND COALESCE(r.ativo,true)
     WHERE t.loja_codigo=p_loja
   ),
   fornecedores AS (
     SELECT
       fornecedor,
-      modalidade,
+      categoria,
+      tratativa,
+      forma,
+      fisico_virtual,
       count(*) AS skus,
       sum(quantidade) AS quantidade,
       sum(valor) AS valor,
-      count(DISTINCT marca) AS marcas
+      count(DISTINCT marca) AS marcas,
+      bool_or(regra_incompleta) AS pendente
     FROM itens
-    GROUP BY fornecedor,modalidade
+    GROUP BY fornecedor,categoria,tratativa,forma,fisico_virtual
   )
   SELECT jsonb_build_object(
     'data_referencia',(SELECT max(data_referencia) FROM itens),
@@ -116,16 +117,20 @@ BEGIN
       'valor',COALESCE((SELECT sum(valor) FROM itens),0),
       'fornecedores',(SELECT count(DISTINCT fornecedor) FROM itens),
       'marcas',(SELECT count(DISTINCT marca) FROM itens),
-      'pendentes',(SELECT count(*) FROM itens WHERE modalidade='Não definido')
+      'pendencias',(SELECT count(*) FROM itens WHERE regra_incompleta)
     ),
     'fornecedores',COALESCE((
       SELECT jsonb_agg(jsonb_build_object(
         'fornecedor',fornecedor,
-        'modalidade',modalidade,
+        'categoria',categoria,
+        'tratativa',tratativa,
+        'forma',forma,
+        'fisico_virtual',fisico_virtual,
         'skus',skus,
         'quantidade',quantidade,
         'valor',valor,
-        'marcas',marcas
+        'marcas',marcas,
+        'pendente',pendente
       ) ORDER BY valor DESC)
       FROM fornecedores
     ),'[]'::jsonb),
@@ -138,13 +143,18 @@ BEGIN
         'fornecedor_origem',fornecedor_origem,
         'fornecedor',fornecedor,
         'marca',marca,
-        'modalidade',modalidade,
+        'tratativa',tratativa,
+        'categoria',categoria,
+        'forma',forma,
+        'fisico_virtual',fisico_virtual,
         'quantidade',quantidade,
         'valor',valor,
         'data_referencia',data_referencia,
         'ean',ean,
         'curva',curva,
-        'fornecedor_codigo',fornecedor_codigo
+        'fornecedor_codigo',fornecedor_codigo,
+        'regra_ausente',regra_ausente,
+        'regra_incompleta',regra_incompleta
       ) ORDER BY fornecedor,valor DESC,produto)
       FROM itens
     ),'[]'::jsonb)

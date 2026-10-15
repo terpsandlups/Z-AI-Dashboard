@@ -18,8 +18,9 @@ assert.equal(Z.select(other,'2026-09','2026-09').goal,1890000);
 const row={data:'2026-09-27',sku:'100',dpto:'001',produto:'Teste',motivo:'Avaria',qtde:1,valor:3};
 assert.throws(()=>Z.validateLossImport({schema:'zai-perdas-import-v1',loja:'007',rows:[row]},other));
 assert.throws(()=>Z.validateLossImport({schema:'zai-perdas-import-v1',loja:'007',rows:[{...row,data:'2026-02-30'}]},d));
-const zero=fixture();zero.vendas_diarias_produto_mes[0][4]=0;
+const zero=fixture();zero.vendas_diarias_resumo=zero.vendas_diarias_resumo.map(r=>[r[0],r[1],0]);
 assert.equal(Z.select(zero,'2026-09','2026-09').ratio,null);
+const exact=Z.select(d,'2026-09-01','2026-09-01');assert.equal(exact.salesTotal,1000);assert.equal(exact.days,1);assert.equal(exact.lossTotal,20);
 console.log('OK: cobertura, perdas recentes, metas, denominador, loja e validação.');
 
 assert.equal(Z.lossTarget(d),.024);

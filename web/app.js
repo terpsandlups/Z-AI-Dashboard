@@ -87,20 +87,20 @@ function render(){
 }
 
 const IMPORT_GUIDES={
- perdas:'Perdas reconhecidas · mantém o comportamento validado do primeiro painel. Excel da operação ou JSON conferido. Complemento preserva o histórico; relatório completo substitui somente os dias presentes.',
- vendas:'Vendas diárias · Excel/CSV com data, SKU, departamento, quantidade e valor. Os dias presentes no novo arquivo substituem os mesmos dias já carregados. Nunca soma duas versões do mesmo dia.',
- saida_estoque:'Saídas de estoque · Auditoria de saída. Estrutura reservada; gravação bloqueada até validarmos o primeiro arquivo real do ERP e suas colunas.',
- entrada_estoque:'Entradas de estoque · Auditoria de entrada. Estrutura reservada; gravação bloqueada até validarmos o primeiro arquivo real do ERP e suas colunas.',
- trocas:'Trocas · será tratado como posição/saldo atual da operação, atualizando o montante total sem somar snapshots antigos. Gravação bloqueada até validarmos o primeiro arquivo real.'
+ perdas:'Perdas reconhecidas · aceita o JSON completo do Kalimera ou Excel operacional. O backup completo deve ser importado como relatório completo, substituindo os dias presentes.',
+ vendas:'Vendas diárias · aceita o relatório horizontal do ERP: cada data possui Vendas, Quantidade e Ct Empresa. O Dashboard usa Vendas e Quantidade e substitui somente os dias presentes.',
+ saida_estoque:'Saídas de estoque = FALTAS. Usa o relatório Auditorias Saídas De Estoque 1 e substitui os dias presentes.',
+ entrada_estoque:'Entradas de estoque = SOBRAS. Usa o relatório Auditorias Entradas Estoque 1 e substitui os dias presentes.',
+ trocas:'Trocas = posição atual de estoque. Cada importação substitui integralmente a posição anterior; snapshots antigos ficam apenas no histórico.'
 };
 function bindImportType(){
  const type=$('#reportType').value,file=$('#lossFile'),mode=$('#importMode'),wrap=$('#modeWrap'),guide=$('#typeGuide');
  pending=null;$('#importPreview').innerHTML='';
- const enabled=type==='perdas'||type==='vendas';
+ const enabled=['perdas','vendas','saida_estoque','entrada_estoque','trocas'].includes(type);
  guide.textContent=IMPORT_GUIDES[type]||'Selecione o tipo de relatório para ver a regra de atualização.';
  mode.disabled=type!=='perdas';wrap.hidden=type!=='perdas';
- if(type==='vendas')mode.value='substituir_dias';
- file.accept=type==='perdas'?'.xlsx,.xls,.json':type==='vendas'?'.xlsx,.xls,.csv':'.xlsx,.xls,.csv';
+ if(type==='vendas'||type==='saida_estoque'||type==='entrada_estoque')mode.value='substituir_dias';
+ file.accept=type==='perdas'?'.xlsx,.xls,.json':'.xlsx,.xls,.csv';
  file.disabled=!enabled||!cloud||data?.papel!=='importador';
  file.value='';
  $('#reportType').onchange=bindImportType;
@@ -140,7 +140,19 @@ async function matrixFrom(file){
 function findHeader(matrix,test){for(let i=0;i<Math.min(15,matrix.length);i++){const h=(matrix[i]||[]).map(hnorm);if(test(h))return [i,h]}throw Error('Cabeçalho do relatório não reconhecido.')}
 async function hashFile(file){const b=await file.arrayBuffer(),d=await crypto.subtle.digest('SHA-256',b);return [...new Uint8Array(d)].map(x=>x.toString(16).padStart(2,'0')).join('')}
 async function parseLossFile(file){
- if(file.name.toLowerCase().endsWith('.json')){const d=JSON.parse(await file.text());return {rows:ZAI.validateLossImport(d,data),note:''}}
+ if(file.name.toLowerCase().endsWith('.json')){
+  const d=JSON.parse(await file.text());
+  if(d.schema==='kalimera-pp-007-v1'&&Array.isArray(d.rows)){
+   const rows=d.rows.map((r,i)=>({
+    data:isoDate(r.data),sku:skuText(r.sku),produto:String(r.produto??'').trim(),
+    dpto:deptCode(r.dpto,r.departamento),motivo:String(r.motivo??'').trim(),
+    qtde:numeric(r.qtde),valor:numeric(r.valor)
+   }));
+   if(rows.some((r,i)=>!/^[0-9]+$/.test(r.sku)||!r.produto||!r.motivo))throw Error('JSON Kalimera possui linha inválida.');
+   return {rows,note:'Backup completo Kalimera. Use “Relatório completo” para atualizar todos os dias presentes no arquivo.'};
+  }
+  return {rows:ZAI.validateLossImport(d,data),note:''};
+ }
  const m=await matrixFrom(file),[hi,head]=findHeader(m,h=>h.includes('codigo')&&(h.includes('dtmvto')||h.includes('data')));
  const f={data:colIndex(head,'dtmvto','data','datamovimento'),sku:colIndex(head,'codigo','sku','codproduto','codigoproduto'),produto:colIndex(head,'descricao','produto','descricaoproduto'),dpto:colIndex(head,'dpto','codigodepartamento','departamentocodigo'),departamento:colIndex(head,'descricaodpto','departamento','descricaodepartamento'),motivo:colIndex(head,'descricaoespecie','motivo'),qtde:colIndex(head,'qtde','quantidade'),valor:colIndex(head,'valor')};
  let ct=false;if(f.valor===null){f.valor=colIndex(head,'ctmedio','customedio');ct=f.valor!==null}
@@ -158,7 +170,41 @@ async function parseLossFile(file){
  return {rows,note:ct?'Ct Médio foi interpretado como valor total da linha, conforme o layout piloto validado.':''};
 }
 async function parseSalesFile(file){
- const m=await matrixFrom(file),[hi,head]=findHeader(m,h=>{
+ const m=await matrixFrom(file);
+ const h1=(m[0]||[]).map(x=>String(x??'').trim()),h2=(m[1]||[]).map(hnorm);
+ const horizontal=h1.slice(6).some(x=>/^\d{2}\/\d{2}\/\d{4}/.test(x))&&h2.slice(6).includes('vendas')&&h2.slice(6).includes('quantidade');
+ if(horizontal){
+  const agg=new Map(),dates=[],source=0,descBySku=new Map();
+  const dateCols=[];
+  for(let c=6;c<h1.length;c++){
+   const mm=h1[c].match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+   if(mm&&h2[c]==='vendas'){
+    const dt=mm[3]+'-'+mm[2]+'-'+mm[1],qCol=c+1;
+    if(h2[qCol]!=='quantidade')throw Error('Layout horizontal inválido próximo de '+h1[c]+'.');
+    dateCols.push({dt,vCol:c,qCol});dates.push(dt);
+   }
+  }
+  for(let i=2;i<m.length;i++){
+   const r=m[i]||[],sku=skuText(r[0]);
+   if(!/^\d+$/.test(sku))continue;
+   const produto=String(r[1]??'').trim()||(data.produtos[sku]?.[0]||'');
+   if(!produto)throw Error('Linha '+(i+1)+': descrição do produto ausente.');
+   if(descBySku.has(sku)&&descBySku.get(sku)!==produto)throw Error('Descrições conflitantes para o SKU '+sku+'.');
+   descBySku.set(sku,produto);
+   const dpto=deptCode(r[3],null);
+   for(const dc of dateCols){
+    const v=Number(r[dc.vCol]??0),q=Number(r[dc.qCol]??0);
+    if(!Number.isFinite(v)||!Number.isFinite(q))throw Error('Linha '+(i+1)+': valor/quantidade inválidos.');
+    if(v===0&&q===0)continue;
+    const key=dc.dt+'|'+sku+'|'+dpto;
+    if(!agg.has(key))agg.set(key,{data:dc.dt,sku,produto,dpto,qtde:0,valor:0});
+    const x=agg.get(key);x.qtde+=q;x.valor+=v;source++;
+   }
+  }
+  const rows=[...agg.values()];if(!rows.length)throw Error('Nenhuma venda encontrada no relatório horizontal.');
+  return {rows,dates:[...new Set(dates)].sort(),source};
+ }
+ const [hi,head]=findHeader(m,h=>{
   const hasSku=h.some(x=>['codigo','sku','codproduto','codigoproduto'].includes(x)),hasDate=h.some(x=>['data','datavenda','dtvenda','dtmvto','datamovimento'].includes(x)),hasQty=h.some(x=>['qtde','quantidade','qtdevendas','quantidadevendida'].includes(x)),hasValue=h.some(x=>['valor','valorvendas','valordevendas','vendaliquida','valorvenda'].includes(x));return hasSku&&hasDate&&hasQty&&hasValue;
  });
  const f={loja:colIndex(head,'loja','codigoloja','codloja'),data:colIndex(head,'data','datavenda','dtvenda','dtmvto','datamovimento'),sku:colIndex(head,'codigo','sku','codproduto','codigoproduto'),produto:colIndex(head,'descricao','produto','descricaoproduto'),dpto:colIndex(head,'dpto','codigodepartamento','departamentocodigo','coddepartamento','depto'),departamento:colIndex(head,'descricaodpto','departamento','descricaodepartamento'),qtde:colIndex(head,'qtde','quantidade','qtdevendas','quantidadevendida'),valor:colIndex(head,'valor','valorvendas','valordevendas','vendaliquida','valorvenda')};
@@ -177,14 +223,42 @@ async function parseSalesFile(file){
  const rows=[...agg.values()];if(!rows.length)throw Error('Nenhuma linha válida de vendas.');
  const dates=[...new Set(rows.map(r=>r.data))].sort();return {rows,dates,source};
 }
-async function previewByType(file){if(!file)return;const type=$('#reportType').value;if(type==='perdas')return previewLoss(file);if(type==='vendas')return previewSales(file);pending=null;$('#importPreview').innerHTML='<div class="notice">Este tipo ainda aguarda o primeiro arquivo real para mapear as colunas com segurança.</div>'}
+function filenameDate(name){
+ const m=String(name).match(/(?:^|\D)(\d{1,2})[-_](\d{1,2})(?:\D|$)/);
+ if(!m)return null;return new Date().getFullYear()+'-'+String(Number(m[2])).padStart(2,'0')+'-'+String(Number(m[1])).padStart(2,'0');
+}
+async function parseAuditFile(file,type){
+ const m=await matrixFrom(file),[hi,head]=findHeader(m,h=>h.includes('dpto')&&h.includes('codigo')&&h.includes('dtmvto')&&h.includes('descricaodcto')&&h.includes('qtde')&&h.includes('valor'));
+ const f={dpto:colIndex(head,'dpto'),departamento:colIndex(head,'descricaodpto'),sku:colIndex(head,'codigo'),produto:colIndex(head,'descricao'),data:colIndex(head,'dtmvto'),documento:colIndex(head,'descricaodcto'),observacao:colIndex(head,'descricaoespecie'),qtde:colIndex(head,'qtde'),valor:colIndex(head,'valor')};
+ const rows=[];
+ for(let i=hi+1;i<m.length;i++){const r=m[i]||[],doc=String(r[f.documento]??''),rowType=/entradas/i.test(doc)?'entrada':/sa[ií]das/i.test(doc)?'saida':null;if(rowType!==type)continue;
+  const sku=skuText(r[f.sku]);if(!/^\d+$/.test(sku))continue;
+  rows.push({data:isoDate(r[f.data]),sku,produto:String(r[f.produto]??'').trim(),dpto:deptCode(r[f.dpto],r[f.departamento]),documento:doc,observacao:String(r[f.observacao]??'').trim(),qtde:numeric(r[f.qtde]),valor:numeric(r[f.valor])});
+ }
+ if(!rows.length)throw Error('Nenhuma linha de '+(type==='entrada'?'SOBRA':'FALTA')+' encontrada no arquivo.');
+ return {rows,dates:[...new Set(rows.map(r=>r.data))].sort()};
+}
+async function parseTrocasFile(file){
+ const m=await matrixFrom(file),[hi,head]=findHeader(m,h=>h.includes('codigo')&&h.includes('descricao')&&h.includes('dpto')&&h.includes('estoque')&&h.includes('ctmedio'));
+ const f={sku:colIndex(head,'codigo'),ean:colIndex(head,'codigobarras'),produto:colIndex(head,'descricao'),curva:colIndex(head,'curva'),dpto:colIndex(head,'dpto'),fornCodigo:colIndex(head,'codultimoforn'),fornecedor:colIndex(head,'nomeultimoforn'),quantidade:colIndex(head,'estoque'),valor:colIndex(head,'ctmedio')};
+ const rows=[];
+ for(let i=hi+1;i<m.length;i++){const r=m[i]||[],sku=skuText(r[f.sku]);if(!/^\d+$/.test(sku)||sku==='0')continue;
+  rows.push({sku,ean:String(r[f.ean]??''),produto:String(r[f.produto]??'').trim(),curva:String(r[f.curva]??'').trim(),dpto:deptCode(r[f.dpto],null),fornecedor_codigo:String(r[f.fornCodigo]??''),fornecedor:String(r[f.fornecedor]??'').trim(),quantidade:numeric(r[f.quantidade]),valor:numeric(r[f.valor]),situacao:'Em trocas'});
+ }
+ if(!rows.length)throw Error('Nenhuma posição de trocas encontrada.');
+ const date=filenameDate(file.name);if(!date)throw Error('O arquivo de trocas precisa ter a data no nome, por exemplo: trocas 14-10.xlsx.');
+ return {rows,date};
+}
+async function previewByType(file){if(!file)return;const type=$('#reportType').value;if(type==='perdas')return previewLoss(file);if(type==='vendas')return previewSales(file);if(type==='entrada_estoque'||type==='saida_estoque')return previewAudit(file,type==='entrada_estoque'?'entrada':'saida');if(type==='trocas')return previewTrocas(file);}
 async function previewLoss(file){pending=null;try{const parsed=await parseLossFile(file),rows=parsed.rows,hash=await hashFile(file),dates=new Set(rows.map(r=>r.data)),mode=$('#importMode').value,old=data.perdas.filter(r=>dates.has(r[0])),total=rows.reduce((s,r)=>s+r.valor,0),key=r=>JSON.stringify(r),keys=new Set(old.map(r=>key([r[0],r[1],r[3],r[4]]))),matches=rows.filter(r=>keys.has(key([r.data,r.sku,r.motivo,r.qtde]))).length,blocked=mode==='complementar'&&matches>0;
  pending={type:'perdas',rows,hash,file:file.name,mode,revision:data.revision};$('#importPreview').innerHTML=\`<div class="notice \${blocked?'error':''}"><b>Prévia de Perdas · \${esc(file.name)}</b><br>\${num(rows.length)} linhas · \${dates.size} dias · \${money(total)}\${parsed.note?'<br>'+esc(parsed.note):''}<br>\${mode==='substituir_dias'?num(old.length)+' linhas existentes serão substituídas; valor anterior '+money(ZAI.sum(old,5))+'.':num(matches)+' possíveis coincidências com registros existentes.'}</div>\${blocked?'<p>Revise o complemento; nenhuma linha foi importada. Não mude para substituição apenas para contornar coincidências.</p>':\`<label style="display:block"><input type="checkbox" id="confirmCheck"> \${mode==='substituir_dias'?'Confirmo que este relatório contém TODOS os lançamentos dos dias presentes.':'Conferi o complemento e seu valor total.'}</label><div class="actions"><button class="primary" id="commitImport">Confirmar gravação no Supabase</button></div>\`}\`;if(!blocked)$('#commitImport').onclick=commitImport;
  }catch(e){msg(e.message,true);$('#importPreview').innerHTML=''}}
 async function previewSales(file){pending=null;try{const p=await parseSalesFile(file),hash=await hashFile(file),set=new Set(p.dates),total=p.rows.reduce((s,r)=>s+r.valor,0),existing=(data.vendas_diarias_resumo||[]).filter(r=>set.has(r[0])),oldTotal=existing.reduce((s,r)=>s+Number(r[2]),0),oldDays=new Set(existing.map(r=>r[0])).size;
  pending={type:'vendas',rows:p.rows,dates:p.dates,hash,file:file.name,revision:data.revision};$('#importPreview').innerHTML=\`<div class="notice"><b>Prévia de Vendas · \${esc(file.name)}</b><br>\${num(p.source)} linhas de origem → \${num(p.rows.length)} combinações consolidadas<br>\${p.dates.length} dias · \${esc(p.dates[0])} a \${esc(p.dates.at(-1))} · \${money(total)}<br>\${oldDays?oldDays+' dias já possuem vendas e serão substituídos; valor atual '+money(oldTotal)+'.':'Nenhum dos dias do arquivo possui venda diária carregada.'}</div><label style="display:block"><input type="checkbox" id="confirmCheck"> Confirmo que o arquivo contém o relatório COMPLETO de vendas para todos os dias presentes. Os mesmos dias serão substituídos.</label><div class="actions"><button class="primary" id="commitImport">Confirmar gravação no Supabase</button></div>\`;$('#commitImport').onclick=commitImport;
  }catch(e){msg(e.message,true);$('#importPreview').innerHTML=''}}
-async function commitImport(){if(!pending||!$('#confirmCheck')?.checked){msg('Confira a prévia e marque a confirmação antes de gravar.',true);return}const p=pending,b=$('#commitImport');b.disabled=true;try{if(p.type==='perdas'){const r=await request('/rest/v1/rpc/zai_importar_perdas',{p_loja:activeStore,p_revision:p.revision,p_hash:p.hash,p_arquivo:p.file,p_modo:p.mode,p_linhas:p.rows});pending=null;await refresh();msg('Perdas gravadas no Supabase: '+num(r.registros)+' registros, '+money(Number(r.valor))+'.');return}if(p.type==='vendas'){let totalRows=0,totalValue=0;for(let i=0;i<p.batches.length;i++){const x=p.batches[i],h=await chunkHash(p.hash,x.dates);$('#importPreview').insertAdjacentHTML('beforeend','<p class="small">Gravando lote '+(i+1)+' / '+p.batches.length+' · '+esc(x.dates[0])+' a '+esc(x.dates.at(-1))+'…</p>');const r=await request('/rest/v1/rpc/zai_importar_vendas',{p_loja:activeStore,p_revision:p.revision+i,p_hash:h,p_arquivo:p.file+' · lote '+(i+1)+'/'+p.batches.length,p_linhas:x.rows,p_datas:x.dates});totalRows+=Number(r.registros||0);totalValue+=Number(r.valor||0)}pending=null;await refresh();msg('Vendas gravadas no Supabase: '+num(totalRows)+' registros consolidados, '+money(totalValue)+'.');return}throw Error('Tipo de importação ainda não habilitado.')}catch(e){msg('Importação interrompida: '+e.message+' Atualize o painel antes de repetir; lotes já confirmados permanecem gravados.',true);if($('#commitImport'))$('#commitImport').disabled=false}}
+async function previewAudit(file,type){pending=null;try{const p=await parseAuditFile(file,type),hash=await hashFile(file),total=p.rows.reduce((s,r)=>s+r.valor,0);pending={type:'auditoria',auditType:type,rows:p.rows,dates:p.dates,hash,file:file.name,revision:data.revision};$('#importPreview').innerHTML=`<div class="notice"><b>${type==='entrada'?'SOBRAS · Auditoria de Entrada':'FALTAS · Auditoria de Saída'}</b><br>${num(p.rows.length)} linhas · ${p.dates.length} dias · ${money(total)}<br>Os mesmos dias deste tipo serão substituídos.</div><label style="display:block"><input type="checkbox" id="confirmCheck"> Confirmo que este é o relatório completo para os dias presentes.</label><div class="actions"><button class="primary" id="commitImport">Confirmar gravação no Supabase</button></div>`;$('#commitImport').onclick=commitImport;}catch(e){msg(e.message,true);$('#importPreview').innerHTML=''}}
+async function previewTrocas(file){pending=null;try{const p=await parseTrocasFile(file),hash=await hashFile(file),total=p.rows.reduce((s,r)=>s+r.valor,0),qty=p.rows.reduce((s,r)=>s+r.quantidade,0);pending={type:'trocas',rows:p.rows,date:p.date,hash,file:file.name,revision:data.revision};$('#importPreview').innerHTML=`<div class="notice"><b>Posição atual de Trocas · ${esc(p.date)}</b><br>${num(p.rows.length)} SKUs · ${num(qty)} unidades/kg · ${money(total)}<br><b>A posição anterior inteira será substituída.</b> O snapshot anterior ficará apenas no histórico.</div><label style="display:block"><input type="checkbox" id="confirmCheck"> Confirmo que este arquivo representa a posição completa de trocas desta data.</label><div class="actions"><button class="primary" id="commitImport">Confirmar substituição da posição</button></div>`;$('#commitImport').onclick=commitImport;}catch(e){msg(e.message,true);$('#importPreview').innerHTML=''}}
+async function commitImport(){if(!pending||!$('#confirmCheck')?.checked){msg('Confira a prévia e marque a confirmação antes de gravar.',true);return}const p=pending,b=$('#commitImport');b.disabled=true;try{if(p.type==='perdas'){const r=await request('/rest/v1/rpc/zai_importar_perdas',{p_loja:activeStore,p_revision:p.revision,p_hash:p.hash,p_arquivo:p.file,p_modo:p.mode,p_linhas:p.rows});pending=null;await refresh();msg('Perdas gravadas no Supabase: '+num(r.registros)+' registros, '+money(Number(r.valor))+'.');return}if(p.type==='auditoria'){const r=await request('/rest/v1/rpc/zai_importar_auditoria',{p_loja:activeStore,p_revision:p.revision,p_hash:p.hash,p_arquivo:p.file,p_tipo:p.auditType,p_linhas:p.rows,p_datas:p.dates});pending=null;await refresh();msg((p.auditType==='entrada'?'Sobras':'Faltas')+' gravadas: '+num(r.registros)+' registros, '+money(Number(r.valor))+'.');return}if(p.type==='trocas'){const r=await request('/rest/v1/rpc/zai_importar_trocas',{p_loja:activeStore,p_revision:p.revision,p_hash:p.hash,p_arquivo:p.file,p_data_referencia:p.date,p_linhas:p.rows});pending=null;await refresh();msg('Posição de trocas substituída: '+num(r.registros)+' SKUs, '+money(Number(r.valor))+'.');return}if(p.type==='vendas'){let totalRows=0,totalValue=0;for(let i=0;i<p.batches.length;i++){const x=p.batches[i],h=await chunkHash(p.hash,x.dates);$('#importPreview').insertAdjacentHTML('beforeend','<p class="small">Gravando lote '+(i+1)+' / '+p.batches.length+' · '+esc(x.dates[0])+' a '+esc(x.dates.at(-1))+'…</p>');const r=await request('/rest/v1/rpc/zai_importar_vendas',{p_loja:activeStore,p_revision:p.revision+i,p_hash:h,p_arquivo:p.file+' · lote '+(i+1)+'/'+p.batches.length,p_linhas:x.rows,p_datas:x.dates});totalRows+=Number(r.registros||0);totalValue+=Number(r.valor||0)}pending=null;await refresh();msg('Vendas gravadas no Supabase: '+num(totalRows)+' registros consolidados, '+money(totalValue)+'.');return}throw Error('Tipo de importação ainda não habilitado.')}catch(e){msg('Importação interrompida: '+e.message+' Atualize o painel antes de repetir; lotes já confirmados permanecem gravados.',true);if($('#commitImport'))$('#commitImport').disabled=false}}
 
 $('#loginOpen').onclick=()=>$('#login').showModal();$('#loginClose').onclick=()=>$('#login').close();$('#loginForm').onsubmit=async e=>{e.preventDefault();$('#loginError').textContent='Conectando…';try{const r=await request('/auth/v1/token?grant_type=password',{email:$('#email').value,password:$('#password').value},false);session={...r,expires_at:Date.now()/1000+r.expires_in};$('#password').value='';$('#loginError').textContent='';$('#login').close();await refresh();}catch(e){$('#loginError').textContent=e.message}};
 $('#logout').onclick=async()=>{if(session)fetch(BASE+'/auth/v1/logout',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+session.access_token}}).catch(()=>{});requestVersion++;session=null;data=null;cloud=false;context=null;pending=null;activeStore='';accessibleStores=[];syncStores();$('#logout').hidden=true;$('#refresh').hidden=true;$('#sourceBadge').textContent='Sessão encerrada';$('#loginOpen').textContent='Conectar Supabase';msg('');render()};$('#refresh').onclick=()=>refresh();$('#apply').onclick=()=>{productPage=0;render()};

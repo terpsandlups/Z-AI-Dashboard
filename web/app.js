@@ -2,6 +2,17 @@
 const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=n=>n==null?'—':new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(n), num=n=>new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2}).format(n), pct=n=>n==null?'—':num(n*100)+'%', pp=n=>n==null?'—':(n>0?'+':'')+num(n*100)+' p.p.';
 const names=['Visão Executiva','Perdas Reconhecidas','Vendas & Participação','Comparador de Períodos','Perdas Desconhecidas · Inventário','Perdas Consolidadas','Estoque de Trocas','Central de Importações'];
+const subtitles=['Indicadores consolidados da operação','Quebras reconhecidas e recorrências','Faturamento e participação por departamento','Evolução entre dois períodos','Faltas, sobras e resultado de inventário','Visão integrada de todas as perdas','Gestão de fornecedores, marcas e tratativas','Atualização segura das bases operacionais'];
+const navIcons=[
+ '<svg viewBox="0 0 24 24"><rect x="3" y="11" width="4" height="8" rx="1"/><rect x="10" y="6" width="4" height="13" rx="1"/><rect x="17" y="3" width="4" height="16" rx="1"/></svg>',
+ '<svg viewBox="0 0 24 24"><path d="M4 6h16M6 9l4 4 4-3 4 5"/><path d="M18 11v4h-4"/></svg>',
+ '<svg viewBox="0 0 24 24"><circle cx="9" cy="19" r="1.5"/><circle cx="18" cy="19" r="1.5"/><path d="M3 4h2l2.2 10.2a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 1.9-1.4L21 8H7"/></svg>',
+ '<svg viewBox="0 0 24 24"><path d="M4 7h12M12 3l4 4-4 4M20 17H8M12 13l-4 4 4 4"/></svg>',
+ '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M15.5 15.5L21 21"/></svg>',
+ '<svg viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/><path d="M8 3v4M14 10v4M18 17v4"/></svg>',
+ '<svg viewBox="0 0 24 24"><path d="M4 7.5L12 3l8 4.5v9L12 21l-8-4.5z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></svg>',
+ '<svg viewBox="0 0 24 24"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>'
+];
 const TRADE_BRAND_OVERRIDES={
  '30074':'Seara','31933':'Seara',
  '17396':'Itambé','56049':'Itambé','77496':'Itambé',
@@ -267,8 +278,8 @@ function exchange(){return `<div class="grid2"><article class="card"><h2>Central
  <article class="card"><h2>Histórico de importações</h2><p class="desc">${cloud?'Registros persistidos no Supabase':'Histórico incluído no arquivo de conferência'}</p>${table(['Arquivo','Quando','Registros','Valor','Tipo'],(data?.historico||[]).map(r=>[esc(r.file||''),esc(r.when?new Date(r.when).toLocaleString('pt-BR'):''),num(r.rows||0),money(r.value||0),esc(r.tipo||'Backup histórico')]))}</article>`;}
 function empty(){return `<article class="card empty"><span class="number">Z</span><h2>Seu painel, conectado às suas lojas</h2><p>Entre na conta do Supabase para consultar os dados salvos. Para conferir esta versão antes da ativação, abra <b>data/base_conferida.json</b> no menu Importar e Exportar.</p><div class="actions" style="justify-content:center"><button class="primary" id="emptyLogin">Conectar Supabase</button><button id="emptyLocal">Abrir base de conferência</button></div></article>`;}
 function render(){
- $('#nav').innerHTML=names.map((n,i)=>`<button data-page="${i}" class="${page===i?'active':''}" title="${esc(n)}" aria-label="${esc(n)}" aria-current="${page===i?'page':'false'}"><span class="navicon" aria-hidden="true">${['📊','📉','🛒','⚖️','🔎','🧮','📦','🔄'][i]}</span><span class="navlabel">${n}</span></button>`).join('');$('#nav').querySelectorAll('button').forEach(b=>b.onclick=()=>{page=+b.dataset.page;msg('');render()});
- $('#pageTitle').textContent=names[page];$('#filters').hidden=!data||page===3||page===6||page===7;$('#coverage').innerHTML='';$('#stamp').textContent='Consultado em '+new Date().toLocaleString('pt-BR');
+ $('#nav').innerHTML=names.map((n,i)=>`<button data-page="${i}" class="${page===i?'active':''}" title="${esc(n)}" aria-label="${esc(n)}" aria-current="${page===i?'page':'false'}"><span class="navicon" aria-hidden="true">${navIcons[i]}</span><span class="navlabel">${n}</span></button>`).join('');$('#nav').querySelectorAll('button').forEach(b=>b.onclick=()=>{page=+b.dataset.page;msg('');render()});
+ $('#pageTitle').textContent=names[page];$('.subtitle').textContent=subtitles[page]||'Dashboard Executivo';$('#filters').hidden=!data||page===3||page===6||page===7;$('#coverage').innerHTML='';$('#stamp').textContent='Consultado em '+new Date().toLocaleString('pt-BR');
  if(data&&[0,1,2,4,5].includes(page)){let from=$('#from').value,to=$('#to').value;if(!from||!to||from>to){msg('Informe datas válidas, com início anterior ao fim.',true);return}context=ZAI.select(data,from,to,$('#dept').value);$('#periodNote').textContent=context.days+' dias no período · '+(context.sources.length?context.sources.join(' / '):'vendas não disponíveis');
  const notices=[];if(context.cut)notices.push('Indicadores comparáveis até '+context.cut.split('-').reverse().join('/')+'.');if(context.unmatchedLossCount)notices.push(num(context.unmatchedLossCount)+' lançamentos posteriores às vendas continuam visíveis em Perdas Reconhecidas.');if(context.missing.length)notices.push('Sem venda diária completa em '+context.missing.join(', ')+'.');if(!context.comparable&&!context.missing.length)notices.push('O percentual exige cobertura compatível entre vendas e perdas.');
  $('#coverage').innerHTML=notices.length?`<div class="notice coverage-summary">${notices.map(esc).join(' · ')}</div>`:'';

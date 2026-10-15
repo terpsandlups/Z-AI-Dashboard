@@ -2,6 +2,15 @@
 const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=n=>n==null?'—':new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(n), num=n=>new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2}).format(n), pct=n=>n==null?'—':num(n*100)+'%', pp=n=>n==null?'—':(n>0?'+':'')+num(n*100)+' p.p.';
 const names=['Visão Executiva','Perdas Reconhecidas','Vendas & Participação','Comparador de Períodos','Perdas Desconhecidas · Inventário','Perdas Consolidadas','Estoque de Trocas','Central de Importações'];
+const TRADE_BRAND_OVERRIDES={
+ '30074':'Seara','31933':'Seara',
+ '17396':'Itambé','56049':'Itambé','77496':'Itambé',
+ '12149':'KIM','73865':'KIM',
+ '40770':'Delícia da Roça',
+ '36331':'Yakult','708':'Yakult',
+ '74845':'Serramar',
+ '72826':'Life','48429':'Life'
+};
 const BASE=window.ZAI_CONFIG?.supabaseUrl||'',KEY=window.ZAI_CONFIG?.publishableKey||'';
 let activeStore='',accessibleStores=[],requestVersion=0;
 let data=null,page=0,cloud=false,session=null,context=null,pending=null,productPage=0,productQuery='',activeDept='',productStatus='',compareAFrom='',compareATo='',compareBFrom='',compareBTo='',compareDept='',salesProductRows=[],salesProductKey='',salesProductLoading=false,tradeSupplier='',tradeCategory='',tradeBrand='',tradeQuery='';
@@ -137,12 +146,21 @@ function tradeCanonical(cat){return ['elas_por_elas','produto_por_produto','troc
 function tradeLabel(cat){cat=tradeCanonical(cat);return ({nf_devolucao:'NF / Nota de devolução',troca_produto:'Troca produto por produto',bonificacao:'Bonificação',mista:'Mista · troca / NF',sem_cadastro:'Sem regra cadastrada'})[cat]||'Outra'}
 function tradeRuleMap(){return new Map((data?.trocas_fornecedores||[]).map(x=>[String(x.fornecedor_codigo||''),{...x,categoria:tradeCanonical(x.categoria)}]))}
 function tradeCleanSupplier(name){return String(name||'').replace(/\s*\([^)]*\)\s*/g,' ').replace(/\*ativo\*/gi,'').replace(/\s+/g,' ').trim()}
+function tradeRuleBrand(rule){
+ const code=String(rule?.fornecedor_codigo||''),override=TRADE_BRAND_OVERRIDES[code];
+ if(override)return override;
+ const parts=tradeRuleBrands(rule?.marca_produto);
+ if(parts.length===1)return parts[0];
+ return tradeCleanSupplier(rule?.fornecedor||rule?.fornecedor_referencia)||'Não cadastrada';
+}
 function tradeBrandFor(item,rule){
+ const code=String(item?.fornecedor_codigo||rule?.fornecedor_codigo||''),override=TRADE_BRAND_OVERRIDES[code];
+ if(override)return override;
  const raw=String(rule?.marca_produto||'').trim(),prod=hnorm(item.produto||'');
  if(raw&&raw!=='***'){
   const parts=raw.split('/').map(x=>x.trim().replace(/\.{3,}$/,'')).filter(Boolean);
   for(const p of parts){const n=hnorm(p);if(n.length>=3&&prod.includes(n))return p}
-  if(parts.length===1&&!/^(somente|troca todos|todos os produtos)/i.test(parts[0]))return parts[0];
+  if(parts.length===1&&!/^(somente|troca todos|todos os produtos|toda linha|iogurtes)$/i.test(parts[0]))return parts[0];
  }
  return tradeCleanSupplier(item.fornecedor||rule?.fornecedor||rule?.fornecedor_referencia)||'Não cadastrada';
 }
@@ -184,7 +202,7 @@ function tradeRuleBrands(raw){
 }
 function tradeBrandOptions(){
  const brands=new Set(tradeItems().map(x=>x.marca).filter(Boolean));
- for(const r of (data?.trocas_fornecedores||[]))for(const b of tradeRuleBrands(r.marca_produto))brands.add(b);
+ for(const r of (data?.trocas_fornecedores||[])){const b=tradeRuleBrand(r);if(b&&b!=='Não cadastrada')brands.add(b)}
  return [...brands].sort((a,b)=>a.localeCompare(b,'pt-BR'));
 }
 function tradeSupplierFocus(rows){
@@ -192,23 +210,23 @@ function tradeSupplierFocus(rows){
  const x=rows.find(r=>String(r.fornecedor_codigo)===tradeSupplier)||
    (data?.trocas_fornecedores||[]).find(r=>String(r.fornecedor_codigo||'')===tradeSupplier);
  if(!x)return '';
- const cat=tradeCanonical(x.categoria),brand=x.marca_produto&&x.marca_produto!=='***'?x.marca_produto:'Cadastro de marca pendente';
- return `<article class="card supplier-focus"><div class="supplier-focus-head"><div><span class="section-kicker">FORNECEDOR 360</span><h2>${esc((x.fornecedor_codigo||'—')+' · '+(x.fornecedor||x.fornecedor_referencia||'Sem nome'))}</h2><p class="desc">Tudo que está em troca para este fornecedor, com a regra operacional usada para orientar o vendedor/comprador.</p></div><span class="trade-tag ${esc(cat)}">${esc(tradeLabel(cat))}</span></div><div class="supplier-meta"><div><small>Regra original</small><strong>${esc(x.tratativa||'Sem cadastro')}</strong></div><div><small>Marca / linha</small><strong>${esc(brand)}</strong></div><div><small>Como resolver</small><strong>${esc(x.forma||'Não informado')}</strong></div><div><small>Físico / descarte</small><strong>${esc(x.fisico_virtual||'Não informado')}</strong></div><div><small>SKUs no filtro</small><strong>${num(Number(x.skus||0))}</strong></div><div><small>Valor no filtro</small><strong>${money(Number(x.valor||0))}</strong></div></div></article>`;
+ const cat=tradeCanonical(x.categoria),brand=(x.marcas||[]).join(', ')||tradeRuleBrand(x),line=x.marca_produto&&x.marca_produto!=='***'?x.marca_produto:'Linha/produtos pendentes';
+ return `<article class="card supplier-focus"><div class="supplier-focus-head"><div><span class="section-kicker">FORNECEDOR 360</span><h2>${esc((x.fornecedor_codigo||'—')+' · '+(x.fornecedor||x.fornecedor_referencia||'Sem nome'))}</h2><p class="desc">Tudo que está em troca para este fornecedor, com a regra operacional usada para orientar o vendedor/comprador.</p></div><span class="trade-tag ${esc(cat)}">${esc(tradeLabel(cat))}</span></div><div class="supplier-meta"><div><small>Regra original</small><strong>${esc(x.tratativa||'Sem cadastro')}</strong></div><div><small>Marca</small><strong>${esc(brand)}</strong></div><div><small>Linha / produtos</small><strong>${esc(line)}</strong></div><div><small>Como resolver</small><strong>${esc(x.forma||'Não informado')}</strong></div><div><small>Físico / descarte</small><strong>${esc(x.fisico_virtual||'Não informado')}</strong></div><div><small>SKUs no filtro</small><strong>${num(Number(x.skus||0))}</strong></div><div><small>Valor no filtro</small><strong>${money(Number(x.valor||0))}</strong></div></div></article>`;
 }
 function tradePage(){
  const all=tradeItems(),items=tradeFilteredItems(),rows=tradeSupplierRows(items),t=data?.trocas_resumo||{},value=items.reduce((a,x)=>a+Number(x.valor||0),0),qty=items.reduce((a,x)=>a+Number(x.quantidade||0),0),skus=new Set(items.map(x=>x.sku)).size,withStock=rows.filter(x=>x.status_saldo==='com_saldo').length,zeroSuppliers=rows.filter(x=>x.status_saldo==='zerado').length;
  const sumCat=c=>items.filter(x=>tradeCanonical(x.categoria)===c).reduce((a,x)=>a+Number(x.valor||0),0),nf=sumCat('nf_devolucao'),troca=sumCat('troca_produto'),bonif=sumCat('bonificacao'),mista=sumCat('mista'),sem=sumCat('sem_cadastro');
  const supplierOptions=(data?.trocas_fornecedores||[]).slice().sort((a,b)=>String(a.fornecedor||'').localeCompare(String(b.fornecedor||''),'pt-BR')).map(x=>`<option value="${esc(x.fornecedor_codigo||'')}" ${String(x.fornecedor_codigo||'')===tradeSupplier?'selected':''}>${esc((x.fornecedor_codigo||'—')+' · '+(x.fornecedor||'Sem nome'))}</option>`).join('');
  const brandOptions=tradeBrandOptions().map(x=>`<option ${x===tradeBrand?'selected':''}>${esc(x)}</option>`).join('');
- const missing=(data?.trocas_fornecedores||[]).filter(x=>tradeCanonical(x.categoria)==='sem_cadastro'),brandMissing=(data?.trocas_fornecedores||[]).filter(x=>tradeCanonical(x.categoria)!=='sem_cadastro'&&(!x.marca_produto||String(x.marca_produto).trim()==='***'));
+ const missing=(data?.trocas_fornecedores||[]).filter(x=>tradeCanonical(x.categoria)==='sem_cadastro'),brandMissing=(data?.trocas_fornecedores||[]).filter(x=>tradeCanonical(x.categoria)!=='sem_cadastro'&&(!x.marca_produto||String(x.marca_produto).trim()==='***')),actionMissing=(data?.trocas_fornecedores||[]).filter(x=>tradeCanonical(x.categoria)!=='sem_cadastro'&&(!x.forma||!String(x.forma).trim()));
  const filtered=Boolean(tradeSupplier||tradeCategory||tradeBrand||tradeQuery);
  const focus=tradeSupplierFocus(rows);
  return `<article class="card trade-toolbar"><div class="section-title compact"><div><span class="section-kicker">CENTRAL DE TROCAS</span><h2>Fornecedor, tratativa e itens em uma única área</h2></div><span class="date-chip">Posição: ${esc(t.data_referencia||'—')}</span></div><p class="desc">Filtre por fornecedor, tratativa ou marca/linha. Todos os indicadores, tabelas e o CSV respeitam o recorte selecionado.</p><div class="trade-filters"><label>Fornecedor<select id="tradeSupplier"><option value="">Todos os fornecedores</option>${supplierOptions}</select></label><label>Tratativa<select id="tradeCategory"><option value="">Todas as tratativas</option><option value="nf_devolucao" ${tradeCategory==='nf_devolucao'?'selected':''}>NF / Nota de devolução</option><option value="troca_produto" ${tradeCategory==='troca_produto'?'selected':''}>Troca produto por produto</option><option value="bonificacao" ${tradeCategory==='bonificacao'?'selected':''}>Bonificação</option><option value="mista" ${tradeCategory==='mista'?'selected':''}>Mista · troca / NF</option><option value="sem_cadastro" ${tradeCategory==='sem_cadastro'?'selected':''}>Sem regra cadastrada</option></select></label><label>Marca / linha<select id="tradeBrand"><option value="">Todas as marcas</option>${brandOptions}</select></label><label class="trade-search">SKU / produto / fornecedor<input id="tradeQuery" value="${esc(tradeQuery)}" placeholder="Buscar..."></label><div class="trade-filter-actions"><button id="tradeApply">Aplicar</button><button id="tradeReset" ${filtered?'':'disabled'}>Limpar</button><button class="primary" id="tradeCsv">↓ CSV para vendedor</button></div></div></article>
  <div class="kpis trade-kpis">${card(filtered?'Posição filtrada':'Posição atual',money(value),num(skus)+' SKUs · '+num(withStock)+' fornecedores com saldo',true)}${card('NF / Nota devolução',money(nf),'Tratativas fiscais')}${card('Troca produto por produto',money(troca),'Elas por elas + produto por produto')}${card('Fornecedores zerados',num(zeroSuppliers),'Continuam visíveis para acompanhamento')}${card('Sem regra cadastrada',money(sem),missing.length+' fornecedores para completar')}</div>
  <div class="trade-summary"><article class="card"><div class="section-title compact"><div><span class="section-kicker">FORNECEDORES</span><h2>Onde está concentrado o estoque de troca</h2></div></div>${bars(rows.slice(0,8).map(x=>[x.fornecedor,x.valor,money(x.valor)]))}</article><article class="card"><div class="section-title compact"><div><span class="section-kicker">TRATATIVAS</span><h2>Composição do recorte</h2></div></div>${bars([['NF / Nota de devolução',nf,money(nf)],['Troca produto por produto',troca,money(troca)],['Bonificação',bonif,money(bonif)],['Mista',mista,money(mista)],['Sem regra',sem,money(sem)]].filter(x=>x[1]>0))}</article></div>
- ${missing.length||brandMissing.length?`<article class="card trade-pending"><div class="section-title compact"><div><span class="section-kicker">CADASTRO</span><h2>Informações que ainda precisamos completar</h2></div></div>${missing.length?'<div class="notice error"><b>'+missing.length+' fornecedores da posição atual não possuem regra vinculada.</b><br>'+missing.map(x=>esc((x.fornecedor_codigo||'—')+' · '+(x.fornecedor||'Sem nome'))).join(' · ')+'</div>':''}${brandMissing.length?'<div class="notice"><b>Marca/linha incompleta:</b> '+brandMissing.map(x=>esc((x.fornecedor_codigo||'—')+' · '+(x.fornecedor||'Sem nome'))).join(' · ')+'</div>':''}<p class="small muted">Não vinculamos códigos diferentes por semelhança de nome. Isso evita aplicar uma tratativa errada a um fornecedor novo.</p></article>`:''}
+ ${missing.length||brandMissing.length||actionMissing.length?`<article class="card trade-pending"><div class="section-title compact"><div><span class="section-kicker">CADASTRO</span><h2>Informações que ainda precisamos completar</h2></div></div>${missing.length?'<div class="notice error"><b>'+missing.length+' fornecedores da posição atual não possuem regra vinculada.</b><br>'+missing.map(x=>esc((x.fornecedor_codigo||'—')+' · '+(x.fornecedor||'Sem nome'))).join(' · ')+'</div>':''}${brandMissing.length?'<div class="notice"><b>Marca/linha incompleta:</b> '+brandMissing.map(x=>esc((x.fornecedor_codigo||'—')+' · '+(x.fornecedor||'Sem nome'))).join(' · ')+'</div>':''}${actionMissing.length?'<div class="notice"><b>Como resolver ainda não informado:</b> '+actionMissing.map(x=>esc((x.fornecedor_codigo||'—')+' · '+(x.fornecedor||x.fornecedor_referencia||'Sem nome'))).join(' · ')+'</div>':''}<p class="small muted">Não vinculamos códigos diferentes por semelhança de nome. Isso evita aplicar uma tratativa errada a um fornecedor novo.</p></article>`:''}
  ${focus}
- <article class="card table-section trade-suppliers"><div class="section-title compact"><div><span class="section-kicker">FORNECEDORES</span><h2>Posição por fornecedor</h2></div><span class="trade-context">${num(rows.length)} no recorte</span></div>${table(['Fornecedor','Status','Tratativa padrão','Regra original','Marca / linha','Como resolver','Físico / descarte','SKUs','Qtde','Valor'],rows.map(x=>[esc((x.fornecedor_codigo||'—')+' · '+x.fornecedor),x.status_saldo==='zerado'?'<span class="status-chip neutral">Zerado</span>':'<span class="status-chip good-chip">Com saldo</span>','<span class="trade-tag '+esc(x.categoria)+'">'+esc(tradeLabel(x.categoria))+'</span>','<span class="wrap-cell">'+esc(x.tratativa||'—')+'</span>','<span class="wrap-cell">'+esc((x.marcas||[]).join(', ')||x.marca_produto||'—')+'</span>','<span class="wrap-cell">'+esc(x.forma||'—')+'</span>','<span class="wrap-cell">'+esc(x.fisico_virtual||'—')+'</span>',num(x.skus),num(x.quantidade),money(x.valor)]))}</article>
+ <article class="card table-section trade-suppliers"><div class="section-title compact"><div><span class="section-kicker">FORNECEDORES</span><h2>Posição por fornecedor</h2></div><span class="trade-context">${num(rows.length)} no recorte</span></div>${table(['Fornecedor','Status','Tratativa padrão','Regra original','Marca','Linha / produtos','Como resolver','Físico / descarte','SKUs','Qtde','Valor'],rows.map(x=>[esc((x.fornecedor_codigo||'—')+' · '+x.fornecedor),x.status_saldo==='zerado'?'<span class="status-chip neutral">Zerado</span>':'<span class="status-chip good-chip">Com saldo</span>','<span class="trade-tag '+esc(x.categoria)+'">'+esc(tradeLabel(x.categoria))+'</span>','<span class="wrap-cell">'+esc(x.tratativa||'—')+'</span>','<span class="wrap-cell">'+esc((x.marcas||[]).join(', ')||tradeRuleBrand(x)||'—')+'</span>','<span class="wrap-cell">'+esc(x.marca_produto||'—')+'</span>','<span class="wrap-cell">'+esc(x.forma||'—')+'</span>','<span class="wrap-cell">'+esc(x.fisico_virtual||'—')+'</span>',num(x.skus),num(x.quantidade),money(x.valor)]))}</article>
  <article class="card table-section trade-items"><div class="section-title compact"><div><span class="section-kicker">ITENS PARA AÇÃO</span><h2>Produtos em estoque para troca</h2></div><span class="trade-context">${num(items.length)} linhas · ${money(value)}</span></div><p class="desc">A lista abaixo é a base do CSV para enviar ao vendedor/comprador. Ao filtrar um fornecedor ou uma marca, o arquivo exportado leva somente esse recorte.</p>${table(['Marca / linha','SKU / Produto','Departamento','Fornecedor','Tratativa','Curva','Quantidade','Valor'],items.map(x=>[esc(x.marca||'—'),esc(x.sku+' · '+x.produto),esc(data.departamentos[x.dpto]||x.dpto),esc(x.fornecedor||'—'),esc(tradeLabel(x.categoria)),esc(x.curva||'—'),num(Number(x.quantidade||0)),money(Number(x.valor||0))]))}</article>`;
 }
 function bindTradePage(){
@@ -222,8 +240,8 @@ function bindTradePage(){
  $('#tradeCsv').onclick=()=>{
   const rows=tradeFilteredItems(),date=data?.trocas_resumo?.data_referencia||new Date().toISOString().slice(0,10);
   csv('trocas_'+activeStore+'_'+date+(tradeSupplier?'_fornecedor_'+tradeSupplier:'')+'.csv',
-   ['Loja','Data posição','Cód. fornecedor','Fornecedor','Marca / linha','Tratativa padrão','Regra original','Como resolver','Físico / descarte','SKU','Produto','Departamento','Curva','Quantidade','Valor'],
-   rows.map(x=>[activeStore,date,x.fornecedor_codigo||'',x.fornecedor||'',x.marca||'',tradeLabel(x.categoria),x.tratativa||'',x.forma||'',x.fisico_virtual||'',x.sku,x.produto,data.departamentos[x.dpto]||x.dpto,x.curva||'',String(Number(x.quantidade||0)).replace('.',','),Number(x.valor||0).toFixed(2).replace('.',',')]));
+   ['Loja','Data posição','Cód. fornecedor','Fornecedor','Marca','Linha / produtos','Tratativa padrão','Regra original','Como resolver','Físico / descarte','SKU','Produto','Departamento','Curva','Quantidade','Valor'],
+   rows.map(x=>[activeStore,date,x.fornecedor_codigo||'',x.fornecedor||'',x.marca||'',x.marca_produto||'',tradeLabel(x.categoria),x.tratativa||'',x.forma||'',x.fisico_virtual||'',x.sku,x.produto,data.departamentos[x.dpto]||x.dpto,x.curva||'',String(Number(x.quantidade||0)).replace('.',','),Number(x.valor||0).toFixed(2).replace('.',',')]));
  };
 }
 function future(){

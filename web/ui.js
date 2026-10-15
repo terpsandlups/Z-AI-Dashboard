@@ -132,12 +132,13 @@ async function exportAuditCsv(){
    p_tipo:auditType||null,p_busca:auditQuery.trim()||null,p_modo:auditMode,p_limit:50000,p_offset:0
   }),rows=r.linhas||[];
   if(auditMode==='individual'){
-   csv('auditorias_'+activeStore+'_individual.csv',['Loja','Data','Tipo','SKU','Produto','Departamento','Quantidade','Valor','Impacto líquido','Documento','Observação'],rows.map(x=>[activeStore,x.data,x.tipo==='saida'?'Falta':'Sobra',x.sku,x.produto,x.departamento,String(x.quantidade??0).replace('.',','),Number(x.valor||0).toFixed(2).replace('.',','),(x.tipo==='saida'?Number(x.valor||0):-Number(x.valor||0)).toFixed(2).replace('.',','),x.documento||'',x.observacao||'']));
+   csv('auditorias_'+activeStore+'_individual.csv',
+    ['Loja','Data','Tipo','SKU','Produto','Departamento','Quantidade','Valor','Impacto líquido','Documento','Observação'],
+    rows.map(x=>[activeStore,x.data,x.tipo==='saida'?'Falta':'Sobra',x.sku,x.produto,x.departamento,String(x.quantidade??0).replace('.',','),Number(x.valor||0).toFixed(2).replace('.',','),(x.tipo==='saida'?Number(x.valor||0):-Number(x.valor||0)).toFixed(2).replace('.',','),x.documento||'',x.observacao||'']));
   }else{
-   csv('auditorias_'+activeStore+'_agrupado.csv',['Loja','SKU','Produto','Departamento','Ocorrências','Dias','Qtde falta','Qtde sobra','Faltas R
-,'Sobras R
-,'Resultado líquido R
-],rows.map(x=>[activeStore,x.sku,x.produto,x.departamento,x.ocorrencias,x.dias,String(x.qtde_falta??0).replace('.',','),String(x.qtde_sobra??0).replace('.',','),Number(x.faltas||0).toFixed(2).replace('.',','),Number(x.sobras||0).toFixed(2).replace('.',','),Number(x.liquido||0).toFixed(2).replace('.',',')]));
+   csv('auditorias_'+activeStore+'_agrupado.csv',
+    ['Loja','SKU','Produto','Departamento','Ocorrências','Dias','Qtde falta','Qtde sobra','Faltas (R$)','Sobras (R$)','Resultado líquido (R$)'],
+    rows.map(x=>[activeStore,x.sku,x.produto,x.departamento,x.ocorrencias,x.dias,String(x.qtde_falta??0).replace('.',','),String(x.qtde_sobra??0).replace('.',','),Number(x.faltas||0).toFixed(2).replace('.',','),Number(x.sobras||0).toFixed(2).replace('.',','),Number(x.liquido||0).toFixed(2).replace('.',',')]));
   }
   msg('CSV de auditorias preparado com '+num(rows.length)+' linhas.');
  }catch(e){msg('Não foi possível exportar auditorias: '+e.message,true)}

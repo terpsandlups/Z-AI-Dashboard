@@ -194,3 +194,15 @@ A posição de Trocas é classificada pela regra operacional do fornecedor em:
 - Sem regra cadastrada.
 
 A tabela `montekali.trocas_regras_fornecedor` guarda a tratativa, forma de resolução, marca/produto e regra de guarda/descarte do físico. Fornecedores não presentes na tabela operacional permanecem explicitamente como **Sem regra cadastrada**, sem classificação inferida.
+
+
+## Trocas · Fornecedor 360
+
+A página de Trocas trabalha com a posição vigente de estoque e organiza a operação por fornecedor.
+
+- **NF / Nota de devolução**: tratativas fiscais, preservando as condições específicas cadastradas.
+- **Troca produto por produto**: categoria analítica única para os termos operacionais “Elas por elas” e “Produto por produto”. O texto original continua salvo para consulta.
+- **Bonificação** e **Mista** permanecem separadas.
+- Fornecedor, tratativa, marca/linha, SKU/produto e busca textual filtram toda a página.
+- O CSV exportado respeita exatamente o recorte aplicado e inclui regra original, orientação operacional e destino físico/descarte.
+- Fornecedores sem regra não são classificados por semelhança de nome; aparecem como pendência de cadastro para evitar tratativa incorreta.

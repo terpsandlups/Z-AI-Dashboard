@@ -47,3 +47,30 @@
 @media(max-width:1050px){.executive-grid,.trade-summary{grid-template-columns:1fr}.target-values{grid-template-columns:repeat(2,minmax(0,1fr))}.executive-kpis,.trade-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:720px){.executive-kpis,.trade-kpis{grid-template-columns:1fr 1fr}.target-values{grid-template-columns:1fr 1fr}.compare-controls{grid-template-columns:1fr 1fr}.compare-controls label:last-of-type{grid-column:1/-1}.compare-controls button{grid-column:1/-1;width:100%}.target-head{display:block}.status-chip{margin-top:8px}.filters input[type=date]{width:145px;min-width:130px}}
 @media(max-width:480px){.executive-kpis,.trade-kpis,.target-values{grid-template-columns:1fr}}
+
+
+/* Trocas Fornecedor 360 */
+.trade-tag.troca_produto{background:#e9f3eb;color:#39734d}
+.trade-toolbar{margin-bottom:14px}
+.trade-filters{display:grid;grid-template-columns:minmax(190px,1.2fr) minmax(180px,1fr) minmax(170px,1fr) minmax(210px,1.2fr) auto;gap:10px;align-items:end}
+.trade-filters label{min-width:0}
+.trade-filters select,.trade-filters input{width:100%}
+.trade-filter-actions{display:flex;gap:7px;align-items:end;flex-wrap:wrap}
+.trade-filter-actions button{white-space:nowrap}
+.trade-context{font-size:10px;color:#617789;background:#edf2f6;border-radius:999px;padding:6px 9px;white-space:nowrap}
+.trade-pending{border-left:4px solid #cc8a67}
+.supplier-focus{border-left:4px solid #4e829f;background:linear-gradient(90deg,#f8fbfd 0,#fff 28%)}
+.supplier-focus-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
+.supplier-focus-head h2{font-size:18px;margin:3px 0 4px}
+.supplier-focus-head .desc{margin-bottom:0!important}
+.supplier-meta{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:18px}
+.supplier-meta>div{background:#f7f9fb;border:1px solid #e5eaf0;border-radius:6px;padding:12px;min-height:74px}
+.supplier-meta small{display:block;color:#778594;font-size:9px;margin-bottom:7px;text-transform:uppercase;letter-spacing:.5px}
+.supplier-meta strong{display:block;font-size:11px;line-height:1.5;color:#2b4153;font-weight:600}
+.wrap-cell{display:block;white-space:normal;min-width:120px;max-width:240px;line-height:1.45}
+.trade-suppliers .table-wrap{max-height:520px}
+.trade-items .table-wrap{max-height:620px}
+.trade-items td:nth-child(2){white-space:normal;min-width:240px;max-width:390px}
+.trade-items td:nth-child(4){white-space:normal;min-width:180px;max-width:260px}
+@media(max-width:1450px){.trade-filters{grid-template-columns:repeat(2,minmax(180px,1fr))}.trade-filter-actions{grid-column:1/-1}.supplier-meta{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:800px){.trade-filters{grid-template-columns:1fr}.trade-filter-actions{grid-column:auto}.trade-filter-actions button{flex:1}.supplier-focus-head{display:block}.supplier-focus-head .trade-tag{margin-top:10px}.supplier-meta{grid-template-columns:1fr}.trade-suppliers,.trade-items{padding:10px}}

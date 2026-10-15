@@ -7,16 +7,23 @@ function syncStores(){
 }
 async function refresh(){
  const version=++requestVersion;
- msg('Carregando dados da filial…');
+ if(session){
+  $('#sourceBadge').textContent='Autenticado · carregando';
+  $('#loginOpen').textContent='Conta conectada';
+  $('#logout').hidden=false;
+ }
+ msg('Carregando a base real da filial… isso pode levar alguns segundos.');
  try{
   accessibleStores=await request('/rest/v1/rpc/zai_lojas',{});
   if(!accessibleStores.length)throw Error('Sua conta não está autorizada para nenhuma loja. Solicite a liberação ao administrador.');
   if(!accessibleStores.some(x=>x.codigo===activeStore))activeStore=accessibleStores[0].codigo;
+  $('#storeSelect').innerHTML=accessibleStores.map(x=>`<option value="${esc(x.codigo)}">${esc(x.codigo+' · '+x.nome)}</option>`).join('');
+  $('#storeSelect').value=activeStore;
   const requested=activeStore,d=await request('/rest/v1/rpc/zai_snapshot',{p_loja:requested});
   if(version!==requestVersion||requested!==activeStore||!session)return;
   if(d.loja!==requested)throw Error('A resposta não corresponde à loja solicitada. Nenhum dado será exibido.');
-  setData(d,true);msg('Dados atualizados da loja '+requested+'.');
- }catch(e){if(version===requestVersion){data=null;cloud=false;render();msg(e.message,true);}}
+  setData(d,true);msg('Dados reais atualizados da loja '+requested+'.');
+ }catch(e){if(version===requestVersion){data=null;cloud=false;render();$('#sourceBadge').textContent=session?'Autenticado · falha ao carregar':'Não conectado';$('#loginOpen').textContent=session?'Conta conectada':'Entrar';$('#logout').hidden=!session;msg(e.message,true);}}
 }
 $('#refresh').onclick=refresh;
 $('#storeSelect').onchange=async e=>{const next=e.target.value;if(!next||next===activeStore)return;activeStore=next;data=null;pending=null;context=null;lossPage=0;lossQuery='';lossReason='';lossStatus='';productQuery='';productStatus='';render();await refresh()};

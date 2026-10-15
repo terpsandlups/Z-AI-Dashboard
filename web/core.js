@@ -14,7 +14,7 @@ const dailyGoal=(data,dept='')=>{const v=data?.baseline?.meta_diaria,w=dept?(dat
 function select(data,from,to,dept=''){
  const start=asDateStart(from),requestedEnd=asDateEnd(to);
  if(!/^\d{4}-\d{2}-\d{2}$/.test(start)||!/^\d{4}-\d{2}-\d{2}$/.test(requestedEnd)||start>requestedEnd)throw Error('Período inválido.');
- const months=monthRange(start,requestedEnd),covered=new Set(data.dias_vendas_completos||[]),allM=data.vendas_mensais||[],daily=data.vendas_diarias_resumo||[];
+ const months=monthRange(start,requestedEnd),covered=new Set(data.dias_vendas_completos||[]),allM=data.vendas_mensais||[],dailyRows=data.vendas_diarias_resumo||[];
  const orderedCovered=[...covered].filter(d=>d>=start&&d<=requestedEnd).sort(),lastCovered=orderedCovered.at(-1);
  const cut=lastCovered&&lastCovered<requestedEnd&&lastCovered.slice(0,7)===requestedEnd.slice(0,7)?lastCovered:null;
  const end=cut||requestedEnd,sales=[],salesDays=new Set(),sources=[],missing=[],comparisonCoverage=new Set();
@@ -22,7 +22,7 @@ function select(data,from,to,dept=''){
  for(const m of months){
   const segStart=start>m+'-01'?start:m+'-01',mEnd=monthEnd(m),segEnd=end<mEnd?end:mEnd;
   if(segStart>segEnd)continue;
-  const calendar=dateSpan(segStart,segEnd),md=allM.filter(r=>r[0]===m),dr=daily.filter(r=>r[0]>=segStart&&r[0]<=segEnd),fullMonth=segStart===m+'-01'&&segEnd===mEnd,dailyComplete=calendar.every(d=>covered.has(d));
+  const calendar=dateSpan(segStart,segEnd),md=allM.filter(r=>r[0]===m),dr=dailyRows.filter(r=>r[0]>=segStart&&r[0]<=segEnd),fullMonth=segStart===m+'-01'&&segEnd===mEnd,dailyComplete=calendar.every(d=>covered.has(d));
   if(dailyComplete){
    for(const r of dr)sales.push([r[0],'',r[1],0,Number(r[2])]);
    calendar.forEach(d=>{salesDays.add(d);comparisonCoverage.add(d)});
@@ -47,13 +47,13 @@ function select(data,from,to,dept=''){
  last=(data.perdas||[]).reduce((d,r)=>r[0]>d?r[0]:d,'0000-01-01'),
  calendar=dateSpan(start,end),
  comparable=calendar.length>0&&!missing.length&&calendar.every(d=>comparisonCoverage.has(d)&&d>=first&&d<=last),
- sv=sum(sl,4),lv=sum(loss,5),daily= dailyGoal(data,dept);
+ sv=sum(sl,4),lv=sum(loss,5),dailyGoalValue=dailyGoal(data,dept);
 
  return {
   months,start,end,requestedEnd,sales:sl,loss,lossAll,lossTotalAll:sum(lossAll,5),
   unmatchedLossCount:lossAll.length-loss.length,salesDays,sources,missing,comparable,
   salesTotal:sv,lossTotal:lv,ratio:comparable&&sv>0?lv/sv:null,days:calendar.length,
-  goal:daily==null?null:Math.round(daily*calendar.length*100)/100,first,last,cut
+  goal:dailyGoalValue==null?null:Math.round(dailyGoalValue*calendar.length*100)/100,first,last,cut
  };
 }
 function departmentRows(data,c){

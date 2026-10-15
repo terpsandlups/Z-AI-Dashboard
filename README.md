@@ -154,3 +154,19 @@ A partir de outubro/2026, a Central de Importações aceita diretamente os forma
 - **Trocas:** posição de estoque; cada arquivo substitui integralmente a posição anterior. O snapshot anterior é mantido somente para auditoria/histórico.
 
 A data de referência de Trocas é lida do nome do arquivo no padrão `trocas DD-MM.xlsx`.
+
+
+## Estrutura de menus executivos
+
+A navegação principal do Z-AI segue a leitura operacional da prevenção de perdas:
+
+1. **Visão Executiva** — Vendas, Perdas Reconhecidas, Perdas Desconhecidas (faltas), Sobras, Perdas Consolidadas e % Consolidada/Vendas, com resumo por departamento.
+2. **Perdas Reconhecidas** — quebras operacionais registradas e análise por produto, motivo e departamento.
+3. **Vendas & Participação** — faturamento, participação dos departamentos e produtos.
+4. **Comparador de Períodos** — compara dois intervalos independentes, inclusive por departamento, usando a mesma fórmula consolidada.
+5. **Perdas Desconhecidas · Inventário** — faltas, sobras e resultado líquido de inventários/contagens.
+6. **Perdas Consolidadas** — Perdas Reconhecidas + Faltas − Sobras, com percentual sobre a venda comparável.
+7. **Estoque de Trocas** — posição atual, sem somar snapshots.
+8. **Central de Importações** — cargas de Vendas, Perdas, Auditorias e Trocas.
+
+Para percentuais sobre vendas, o painel usa somente a cobertura comparável entre vendas e perdas; lançamentos posteriores continuam visíveis nas páginas operacionais, mas não distorcem o indicador executivo.

@@ -1,38 +1,34 @@
 BEGIN;
 
-CREATE TABLE IF NOT EXISTS montekali.trocas_regras_fornecedor (
-  loja_codigo text NOT NULL REFERENCES montekali.lojas(codigo),
-  chave text NOT NULL,
-  nome_exibicao text NOT NULL,
-  aliases text[] NOT NULL DEFAULT '{}',
-  destino_fisico text CHECK (destino_fisico IN ('descarte','guardar_fisico')),
-  modalidade text CHECK (modalidade IN ('nota_de_devolucao','produto_por_produto')),
-  marca text,
-  observacao text,
-  atualizado_em timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (loja_codigo,chave)
-);
+ALTER TABLE montekali.trocas_regras_fornecedor
+  ADD COLUMN IF NOT EXISTS grupo_exibicao text;
 
-ALTER TABLE montekali.trocas_regras_fornecedor ENABLE ROW LEVEL SECURITY;
-REVOKE ALL ON montekali.trocas_regras_fornecedor FROM PUBLIC, anon, authenticated;
+UPDATE montekali.trocas_regras_fornecedor
+SET grupo_exibicao = COALESCE(grupo_exibicao, fornecedor_referencia)
+WHERE grupo_exibicao IS NULL;
 
-INSERT INTO montekali.trocas_regras_fornecedor
-  (loja_codigo,chave,nome_exibicao,aliases,destino_fisico,marca,observacao)
-VALUES
-  ('007','seara','Seara',ARRAY['Seara ( Ativo )','Seara ( Acougue)'],'descarte','Seara','Definido pela operação'),
-  ('007','itambe','Itambé',ARRAY['Itambe Minas Com e Distrib De Alim Ativo Lojas','Itambe - Ativo'],'descarte','Itambé','Definido pela operação'),
-  ('007','palmerin','Palmerin',ARRAY['Palmerin'],'guardar_fisico','Palmerin','Definido pela operação'),
-  ('007','delicia','Delícia',ARRAY['Delicia Da Roca'],'guardar_fisico','Delícia','Definido pela operação'),
-  ('007','nsa','NSA',ARRAY['Nsa Distribuidora (yakult)'],'guardar_fisico',NULL,'Definido pela operação'),
-  ('007','serramar','Serramar',ARRAY['Serramar'],'guardar_fisico','Serramar','Definido pela operação'),
-  ('007','campobom','Campobom',ARRAY['Campobom Ltda'],'guardar_fisico','Campobom','Definido pela operação')
-ON CONFLICT (loja_codigo,chave) DO UPDATE SET
-  nome_exibicao=EXCLUDED.nome_exibicao,
-  aliases=EXCLUDED.aliases,
-  destino_fisico=EXCLUDED.destino_fisico,
-  marca=EXCLUDED.marca,
-  observacao=EXCLUDED.observacao,
-  atualizado_em=now();
+UPDATE montekali.trocas_regras_fornecedor
+SET fisico_virtual='Descartar',
+    grupo_exibicao=CASE
+      WHEN fornecedor_codigo IN ('31933','30074') THEN 'Seara'
+      WHEN fornecedor_codigo IN ('56049','77496','17396') THEN 'Itambé'
+      ELSE grupo_exibicao
+    END,
+    atualizado_em=now()
+WHERE fornecedor_codigo IN ('31933','30074','56049','77496','17396');
+
+UPDATE montekali.trocas_regras_fornecedor
+SET fisico_virtual='Precisa guardar o físico',
+    grupo_exibicao=CASE fornecedor_codigo
+      WHEN '73865' THEN 'Palmerin'
+      WHEN '40770' THEN 'Delícia'
+      WHEN '36331' THEN 'NSA'
+      WHEN '74845' THEN 'Serramar'
+      WHEN '72826' THEN 'Campobom'
+      ELSE grupo_exibicao
+    END,
+    atualizado_em=now()
+WHERE fornecedor_codigo IN ('73865','40770','36331','74845','72826');
 
 CREATE OR REPLACE FUNCTION public.zai_snapshot(p_loja text DEFAULT '007')
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
@@ -110,11 +106,17 @@ BEGIN
  ),
  'trocas_regras',COALESCE((
    SELECT jsonb_agg(jsonb_build_object(
-     'chave',chave,'nome',nome_exibicao,'aliases',aliases,
-     'destino_fisico',destino_fisico,'modalidade',modalidade,'marca',marca
-   ) ORDER BY nome_exibicao)
+     'fornecedor_codigo',fornecedor_codigo,
+     'fornecedor_referencia',fornecedor_referencia,
+     'grupo',COALESCE(grupo_exibicao,fornecedor_referencia),
+     'tratativa',tratativa,
+     'categoria',categoria,
+     'forma',forma,
+     'marca_produto',marca_produto,
+     'fisico_virtual',fisico_virtual
+   ) ORDER BY COALESCE(grupo_exibicao,fornecedor_referencia),fornecedor_referencia)
    FROM montekali.trocas_regras_fornecedor
-   WHERE loja_codigo=p_loja
+   WHERE ativo
  ),'[]'::jsonb),
  'trocas_detalhe',COALESCE((
    SELECT jsonb_agg(jsonb_build_object(
@@ -122,29 +124,24 @@ BEGIN
      'produto',p.descricao,
      'departamento',t.departamento_codigo,
      'fornecedor_origem',t.fornecedor,
-     'fornecedor_grupo',COALESCE(r.nome_exibicao,t.fornecedor),
-     'marca',r.marca,
-     'destino_fisico',r.destino_fisico,
-     'modalidade',r.modalidade,
+     'fornecedor_codigo',t.dados_origem->>'fornecedor_codigo',
+     'fornecedor_grupo',COALESCE(r.grupo_exibicao,r.fornecedor_referencia,t.fornecedor),
+     'tratativa',r.tratativa,
+     'categoria',r.categoria,
+     'forma',r.forma,
+     'marca_produto',r.marca_produto,
+     'fisico_virtual',r.fisico_virtual,
      'quantidade',t.quantidade,
      'valor',t.valor,
      'data_referencia',t.data_referencia,
      'ean',t.dados_origem->>'ean',
-     'curva',t.dados_origem->>'curva',
-     'fornecedor_codigo',t.dados_origem->>'fornecedor_codigo'
-   ) ORDER BY COALESCE(r.nome_exibicao,t.fornecedor),t.valor DESC,t.sku)
+     'curva',t.dados_origem->>'curva'
+   ) ORDER BY COALESCE(r.grupo_exibicao,r.fornecedor_referencia,t.fornecedor),t.valor DESC,t.sku)
    FROM montekali.trocas_posicao t
    LEFT JOIN montekali.produtos p ON p.sku=t.sku
-   LEFT JOIN LATERAL (
-      SELECT rr.*
-      FROM montekali.trocas_regras_fornecedor rr
-      WHERE rr.loja_codigo=p_loja
-        AND EXISTS (
-          SELECT 1 FROM unnest(rr.aliases) a
-          WHERE lower(trim(a))=lower(trim(t.fornecedor))
-        )
-      LIMIT 1
-   ) r ON true
+   LEFT JOIN montekali.trocas_regras_fornecedor r
+     ON r.fornecedor_codigo=t.dados_origem->>'fornecedor_codigo'
+    AND r.ativo
    WHERE t.loja_codigo=p_loja
  ),'[]'::jsonb),
  'historico',COALESCE((

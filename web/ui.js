@@ -45,28 +45,4 @@ function bindLossGrid(){
  $('#lossSearch').oninput=e=>{lossQuery=e.target.value;lossPage=0;renderLossGrid()};$('#lossReason').onchange=e=>{lossReason=e.target.value;lossPage=0;renderLossGrid()};$('#lossStatus').onchange=e=>{lossStatus=e.target.value;lossPage=0;renderLossGrid()};
  $('#lossExport').onclick=()=>{const rows=lossRows();csv('perdas_'+activeStore+'_'+lossMode+'.csv',lossMode==='individual'?['Loja','Data','SKU','Produto','Departamento','Motivo','Quantidade origem','Valor']:['Loja','SKU','Produto','Departamento','Ocorrências','Dias','Quantidade origem','Valor'],rows.map(r=>lossMode==='individual'?[activeStore,r.data,r.sku,r.produto,r.departamento,r.motivo,String(r.qtde).replace('.',','),r.valor.toFixed(2).replace('.',',')]:[activeStore,r.sku,r.produto,r.departamento,r.ocorrencias,r.dias,String(r.qtde).replace('.',','),r.valor.toFixed(2).replace('.',',')]))};
 }
-function bindImportType(){
- $('#reportType').onchange=()=>{
-  pending=null;$('#lossFile').value='';$('#importPreview').innerHTML='';const type=$('#reportType').value;
-  const info={perdas:'Destino: perdas reconhecidas. JSON do conversor, com data, SKU, departamento, motivo, quantidade e valor total.',vendas:'Destino: vendas diárias. JSON zai-vendas-import-v1 com dias completos explicitamente confirmados. Substitui somente esses dias, com auditoria.',auditorias:'Auditorias: aguardando o layout real de sobras e faltas. A gravação permanece bloqueada para impedir interpretação incorreta dos campos.',trocas:'Trocas: aguardando o layout real, incluindo fornecedor e situação. A gravação permanece bloqueada até validar o contrato de dados.'};
-  $('#typeGuide').textContent=info[type]||'Selecione o tipo antes de escolher o arquivo.';
-  $('#lossFile').disabled=!cloud||data?.papel!=='importador'||!['perdas','vendas'].includes(type);
-  $('#importMode').disabled=type!=='perdas';if(type==='vendas')$('#importMode').value='substituir_dias';else if(type==='perdas')$('#importMode').value='complementar';
- };
-}
-async function previewByType(file){
- const type=$('#reportType').value;
- if(type==='perdas')return preview(file);
- if(type!=='vendas'||!file){msg('Selecione um tipo de relatório habilitado.',true);return}
- pending=null;try{
-  const text=await file.text(),d=JSON.parse(text),rows=d.rows,days=d.dias_completos;
-  if(d.schema!=='zai-vendas-import-v1'||d.loja!==activeStore||!Array.isArray(rows)||!rows.length||rows.length>100000||!Array.isArray(days)||!days.length)throw Error('JSON de vendas inválido ou de outra loja. Confira o modelo incluído no pacote.');
-  for(const r of rows)ZAI.validateLossImport({schema:'zai-perdas-import-v1',loja:d.loja,rows:[{...r,motivo:'venda'}]},data);
-  if(rows.some(r=>!days.includes(r.data))||days.some(d=>!/^\d{4}-\d{2}-\d{2}$/.test(d)||new Date(d).toISOString().slice(0,10)!==d))throw Error('Dias de cobertura inválidos ou incompatíveis com as linhas.');
-  const hash=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text)))].map(x=>x.toString(16).padStart(2,'0')).join(''),total=rows.reduce((s,r)=>s+r.valor,0);
-  pending={type,rows,days,hash,file:file.name,revision:data.revision};
-  $('#importPreview').innerHTML=`<div class="notice"><b>Prévia de vendas · loja ${esc(activeStore)}</b><br>${num(rows.length)} linhas · ${new Set(days).size} dias completos · ${money(total)}<br>Os registros existentes nesses dias serão substituídos; a versão anterior ficará na auditoria.</div><label><span><input id="confirmCheck" type="checkbox"> Confirmo que estes são relatórios completos dos dias informados.</span></label><div class="actions"><button id="commitSales" class="primary">Gravar vendas no Supabase</button></div>`;
-  $('#commitSales').onclick=async()=>{if(!$('#confirmCheck').checked)return msg('Confirme a cobertura completa antes de gravar.',true);const p=pending;$('#commitSales').disabled=true;try{const r=await request('/rest/v1/rpc/zai_importar_vendas',{p_loja:activeStore,p_revision:p.revision,p_hash:p.hash,p_arquivo:p.file,p_linhas:p.rows,p_datas:p.days});pending=null;await refresh();msg('Vendas gravadas: '+num(r.registros)+' linhas; '+money(r.valor));}catch(e){msg(e.message,true);if($('#commitSales'))$('#commitSales').disabled=false}};
- }catch(e){msg(e.message,true)}
-}
 render();syncStores();$('#login').showModal();

@@ -170,3 +170,27 @@ A navegação principal do Z-AI segue a leitura operacional da prevenção de pe
 8. **Central de Importações** — cargas de Vendas, Perdas, Auditorias e Trocas.
 
 Para percentuais sobre vendas, o painel usa somente a cobertura comparável entre vendas e perdas; lançamentos posteriores continuam visíveis nas páginas operacionais, mas não distorcem o indicador executivo.
+
+
+## Dashboard operacional vNext
+
+A navegação executiva usa filtro por **data inicial e final**. Para períodos com base diária, os indicadores são calculados no intervalo exato; o histórico que existe somente em competência mensal continua disponível quando o mês inteiro é selecionado.
+
+### Meta de perdas
+
+- Meta geral Loja 007: **2,40%**.
+- Realizado executivo: `Perdas Consolidadas / Vendas comparáveis`.
+- Perdas Consolidadas: `Perdas Reconhecidas + Faltas - Sobras`.
+- O painel mostra Meta, Realizado, Desvio em p.p. e Limite financeiro da meta.
+
+### Estoque de Trocas
+
+A posição de Trocas é classificada pela regra operacional do fornecedor em:
+- NF / Nota de Devolução;
+- Elas por elas;
+- Bonificação;
+- Produto por produto;
+- Mista;
+- Sem regra cadastrada.
+
+A tabela `montekali.trocas_regras_fornecedor` guarda a tratativa, forma de resolução, marca/produto e regra de guarda/descarte do físico. Fornecedores não presentes na tabela operacional permanecem explicitamente como **Sem regra cadastrada**, sem classificação inferida.

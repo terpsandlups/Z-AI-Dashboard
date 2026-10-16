@@ -9,7 +9,7 @@ const asDateStart=v=>String(v||'').length===7?String(v)+'-01':String(v||'');
 const asDateEnd=v=>String(v||'').length===7?monthEnd(String(v)):String(v||'');
 const dateSpan=(a,b)=>{const out=[],d=new Date(a+'T12:00:00Z'),end=new Date(b+'T12:00:00Z');while(d<=end&&out.length<5000){out.push(d.toISOString().slice(0,10));d.setUTCDate(d.getUTCDate()+1)}return out};
 const lossTarget=data=>{const v=data?.baseline?.meta_perda;return typeof v==='number'&&Number.isFinite(v)&&v>=0&&v<=1?v:null};
-const dailyGoal=(data,dept='')=>{const v=data?.baseline?.meta_diaria,w=dept?(data.metas||[]).find(x=>x.codigo===dept)?.participacao:1;return typeof v==='number'&&Number.isFinite(v)&&v>=0&&typeof w==='number'&&Number.isFinite(w)&&w>=0&&w<=1?Math.round(v*w*100)/100:null};
+const dailyGoal=(data,dept='')=>{const v=data?.baseline?.meta_diaria,w=dept?(data.metas||[]).find(x=>x.codigo===dept)?.meta_participacao??(data.metas||[]).find(x=>x.codigo===dept)?.participacao:1;return typeof v==='number'&&Number.isFinite(v)&&v>=0&&typeof w==='number'&&Number.isFinite(w)&&w>=0&&w<=1?Math.round(v*w*100)/100:null};
 
 function select(data,from,to,dept=''){
  const start=asDateStart(from),requestedEnd=asDateEnd(to);
@@ -68,7 +68,9 @@ function departmentAnalytics(data,c){
   const lossShare=storeLoss>0?r.loss/storeLoss:null;
   const storeLossImpact=c.comparable&&storeSales>0?r.loss/storeSales:null;
   const shareGap=salesShare!==null&&lossShare!==null?lossShare-salesShare:null;
-  return {...r,salesShare,lossShare,storeLossImpact,shareGap};
+  const targetShare=(data.metas||[]).find(x=>x.codigo===r.code)?.meta_participacao??null;
+  const shareDeviation=salesShare!==null&&targetShare!==null?salesShare-targetShare:null;
+  return {...r,salesShare,lossShare,storeLossImpact,shareGap,targetShare,shareDeviation};
  });
 }
 function weekdays(data,c,dept=''){

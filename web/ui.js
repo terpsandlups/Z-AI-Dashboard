@@ -1,6 +1,6 @@
 /* Shared shell and operational components. Data/metrics remain in app.js/core.js. */
-let lossMode='individual',lossQuery='',lossReason='',lossStatus='',lossPage=0,lossSort='valor',lossDirection=-1;
-let auditMode='agrupado',auditType='',auditQuery='',auditPage=0,auditData=null,auditLoadedKey='',auditLoading=false,auditSearchTimer=null;
+let lossMode='individual',lossQuery='',lossReason='',lossStatus='',lossKind='',lossPage=0,lossSort='valor',lossDirection=-1;
+let auditMode='agrupado',auditType='',auditQuery='',auditSort='movimentado',auditSortDirection=-1,auditPage=0,auditData=null,auditLoadedKey='',auditLoading=false,auditSearchTimer=null;
 function syncStores(){
  const stores=cloud?accessibleStores:(data?[{codigo:data.loja,nome:data.nome}]:[]);
  $('#storeSelect').innerHTML=stores.length?stores.map(s=>`<option value="${esc(s.codigo)}">${esc(s.codigo+' · '+s.nome)}</option>`).join(''):'<option value="">Selecione a loja</option>';
@@ -31,13 +31,15 @@ $('#storeSelect').onchange=async e=>{const next=e.target.value;if(!next||next===
 $('#sidebarToggle').onclick=()=>{const expanded=document.body.classList.toggle('expanded');document.body.classList.toggle('rail',!expanded);$('#sidebarToggle').setAttribute('aria-expanded',String(expanded));$('#sidebarToggle').setAttribute('aria-label',expanded?'Recolher navegação':'Expandir navegação')};
 function losses(){
  const c={...context,loss:context.lossAll,lossTotal:context.lossTotalAll,ratio:context.unmatchedLossCount?null:context.ratio},meta=ZAI.lossTarget(data),goal=$('#dept').value?(data.metas||[]).find(x=>x.codigo===$('#dept').value)?.meta_perda:null,target=goal??meta;
+ const shown=c.loss.filter(r=>!lossKind||lossKindOf(r[3])===lossKind);
+ c.loss=shown;c.lossTotal=ZAI.sum(shown,5);c.ratio=context.comparable&&context.salesTotal>0&&(!context.unmatchedLossCount)?c.lossTotal/context.salesTotal:null;
  const byReason=new Map();c.loss.forEach(r=>byReason.set(r[3],(byReason.get(r[3])||0)+r[5]));
  return `<div class="kpis">${card('Perdas reconhecidas',money(c.lossTotal),num(c.loss.length)+' ocorrências',true)}${card('Vendas no período',c.sales.length?money(c.salesTotal):'—',c.cut?'Vendas completas até '+c.cut:'Mesmo filtro de loja e departamento')}${card('Perda sobre as vendas',pct(c.ratio),target===null?'Meta da loja não configurada':c.ratio===null?c.unmatchedLossCount?'Aguardando vendas dos dias mais recentes':'Cobertura incompatível':pp(c.ratio-target)+' sobre a referência')}${card(goal!=null?'Meta do departamento':'Meta geral de perdas',pct(target),target!==null&&c.sales.length?'Limite: '+money(c.salesTotal*target):'Aguardando vendas')}</div>
  <div class="grid2 losses-charts"><article class="card"><h2>Perdas por motivo</h2>${bars([...byReason].sort((a,b)=>b[1]-a[1]).slice(0,5))}</article><article class="card"><h2>Departamentos com maior perda</h2>${bars(ZAI.departmentRows(data,c).sort((a,b)=>b.loss-a.loss).slice(0,5).map(r=>[r.name,r.loss]))}</article></div>
- <article class="card grid-card"><div class="section-title"><h2>Detalhamento das perdas</h2><div class="actions"><button id="lossIndividual" class="${lossMode==='individual'?'primary':''}">Individual</button><button id="lossGrouped" class="${lossMode==='grouped'?'primary':''}">Agrupado por SKU</button><button id="lossExport">↓ CSV</button></div></div><div class="searchrow"><input id="lossSearch" placeholder="Buscar SKU ou produto" value="${esc(lossQuery)}"><select id="lossReason" aria-label="Motivo"><option value="">Todos os motivos</option>${[...new Set(c.loss.map(r=>r[3]))].sort().map(x=>`<option>${esc(x)}</option>`).join('')}</select><select id="lossStatus" aria-label="Situação do produto"><option value="">Todos os status</option><option>Ativo</option><option>Inativo</option><option>Nao informado</option></select></div><div id="lossGrid"></div><p class="small muted">Situação atual do cadastro. “Não informado” não significa ativo. Clique nos cabeçalhos para ordenar; o CSV inclui todo o resultado filtrado.</p></article>`;
+ <article class="card grid-card"><div class="section-title"><h2>Detalhamento das perdas</h2><div class="actions"><button id="lossIndividual" class="${lossMode==='individual'?'primary':''}">Individual</button><button id="lossGrouped" class="${lossMode==='grouped'?'primary':''}">Agrupado por SKU</button><button id="lossExport">↓ CSV</button></div></div><div class="searchrow"><input id="lossSearch" placeholder="Buscar SKU ou produto" value="${esc(lossQuery)}"><select id="lossKind" aria-label="Tipo de perda"><option value="">Todos os tipos de quebras</option>${LOSS_KINDS.map(([k,n])=>`<option value="${k}" ${lossKind===k?'selected':''}>${n}</option>`).join('')}</select><select id="lossReason" aria-label="Motivo"><option value="">Todos os motivos</option>${[...new Set(c.loss.map(r=>r[3]))].sort().map(x=>`<option>${esc(x)}</option>`).join('')}</select><select id="lossStatus" aria-label="Situação do produto"><option value="">Todos os status</option><option>Ativo</option><option>Inativo</option><option>Nao informado</option></select></div><div id="lossGrid"></div><p class="small muted">Situação atual do cadastro. “Não informado” não significa ativo. Clique nos cabeçalhos para ordenar; o CSV inclui todo o resultado filtrado.</p></article>`;
 }
 function lossRows(){
- const q=lossQuery.toLocaleLowerCase('pt-BR');let rows=context.lossAll.map(r=>({data:r[0],sku:r[1],produto:data.produtos[r[1]]?.[0]||r[1],dpto:r[2],departamento:data.departamentos[r[2]]||r[2],motivo:r[3],qtde:r[4],valor:r[5],status:data.produtos[r[1]]?.[1]||'Nao informado'})).filter(r=>(!q||(r.sku+' '+r.produto).toLocaleLowerCase('pt-BR').includes(q))&&(!lossReason||r.motivo===lossReason)&&(!lossStatus||r.status===lossStatus));
+ const q=lossQuery.toLocaleLowerCase('pt-BR');let rows=context.lossAll.map(r=>({data:r[0],sku:r[1],produto:data.produtos[r[1]]?.[0]||r[1],dpto:r[2],departamento:data.departamentos[r[2]]||r[2],motivo:r[3],qtde:r[4],valor:r[5],status:data.produtos[r[1]]?.[1]||'Nao informado'})).filter(r=>(!q||(r.sku+' '+r.produto).toLocaleLowerCase('pt-BR').includes(q))&&(!lossReason||r.motivo===lossReason)&&(!lossKind||lossKindOf(r.motivo)===lossKind)&&(!lossStatus||r.status===lossStatus));
  if(lossMode==='grouped'){const m=new Map();for(const r of rows){let k=r.sku+'|'+r.dpto;if(!m.has(k))m.set(k,{...r,qtde:0,valor:0,ocorrencias:0,dias:new Set()});let x=m.get(k);x.qtde+=r.qtde;x.valor+=r.valor;x.ocorrencias++;x.dias.add(r.data)}rows=[...m.values()].map(r=>({...r,dias:r.dias.size,media:r.valor/r.ocorrencias}));}
  return rows.sort((a,b)=>{let x=a[lossSort],y=b[lossSort];return lossDirection*(typeof x==='number'?x-y:String(x??'').localeCompare(String(y??''),'pt-BR'))});
 }
@@ -48,9 +50,9 @@ function renderLossGrid(){
  $('#lossGrid').querySelectorAll('[data-sort]').forEach(b=>b.onclick=()=>{const k=b.dataset.sort;lossDirection=lossSort===k?-lossDirection:1;lossSort=k;renderLossGrid()});$('#lossPrev').onclick=()=>{lossPage--;renderLossGrid()};$('#lossNext').onclick=()=>{lossPage++;renderLossGrid()};
 }
 function bindLossGrid(){
- $('#lossReason').value=lossReason;$('#lossStatus').value=lossStatus;renderLossGrid();
+ $('#lossReason').value=lossReason;$('#lossKind').value=lossKind;$('#lossStatus').value=lossStatus;renderLossGrid();
  $('#lossIndividual').onclick=()=>{lossMode='individual';lossSort='valor';lossPage=0;render()};$('#lossGrouped').onclick=()=>{lossMode='grouped';lossSort='valor';lossPage=0;render()};
- $('#lossSearch').oninput=e=>{lossQuery=e.target.value;lossPage=0;renderLossGrid()};$('#lossReason').onchange=e=>{lossReason=e.target.value;lossPage=0;renderLossGrid()};$('#lossStatus').onchange=e=>{lossStatus=e.target.value;lossPage=0;renderLossGrid()};
+ $('#lossSearch').oninput=e=>{lossQuery=e.target.value;lossPage=0;renderLossGrid()};$('#lossReason').onchange=e=>{lossReason=e.target.value;lossPage=0;renderLossGrid()};$('#lossKind').onchange=e=>{lossKind=e.target.value;lossPage=0;render()};$('#lossStatus').onchange=e=>{lossStatus=e.target.value;lossPage=0;renderLossGrid()};
  $('#lossExport').onclick=()=>{const rows=lossRows();csv('perdas_'+activeStore+'_'+lossMode+'.csv',lossMode==='individual'?['Loja','Data','SKU','Produto','Departamento','Motivo','Quantidade origem','Valor']:['Loja','SKU','Produto','Departamento','Ocorrências','Dias','Quantidade origem','Valor'],rows.map(r=>lossMode==='individual'?[activeStore,r.data,r.sku,r.produto,r.departamento,r.motivo,String(r.qtde).replace('.',','),r.valor.toFixed(2).replace('.',',')]:[activeStore,r.sku,r.produto,r.departamento,r.ocorrencias,r.dias,String(r.qtde).replace('.',','),r.valor.toFixed(2).replace('.',',')]))};
 }
 function auditRequestKey(){
@@ -89,14 +91,25 @@ function audits(){
     <input id="auditSearch" placeholder="Buscar SKU, produto ou departamento" value="${esc(auditQuery)}">
     <select id="auditType"><option value="">Sobras e faltas</option><option value="saida" ${auditType==='saida'?'selected':''}>Somente faltas</option><option value="entrada" ${auditType==='entrada'?'selected':''}>Somente sobras</option></select>
    </div>
-   <div id="auditGrid">${auditGridHtml(fresh?d:null)}</div>
+   <div class="audit-sortline"><label>Ordenar ${auditMode==='agrupado'?'agrupamento':'movimentos'} <select id="auditSort">
+  <option value="movimentado" ${auditSort==='movimentado'?'selected':''}>Maior movimentação</option>
+  <option value="liquido_desc" ${auditSort==='liquido_desc'?'selected':''}>Maior falta líquida</option>
+  <option value="liquido_asc" ${auditSort==='liquido_asc'?'selected':''}>Maior sobra líquida</option>
+  </select></label><span class="small muted">Ordenação visual nesta página; exportação CSV ordenada no conjunto completo.</span></div>
+ <div id="auditGrid">${auditGridHtml(fresh?d:null)}</div>
    <p class="small muted">Saída de estoque = falta. Entrada de estoque = sobra. O modo agrupado consolida recorrências do mesmo SKU/departamento no período.</p>
   </article>`;
 }
 function auditGridHtml(d){
  if(auditLoading&&!d)return '<div class="loading-state">Carregando auditorias do período…</div>';
  if(!d)return '<div class="loading-state">Carregando auditorias do período…</div>';
- const rows=d.linhas||[],total=Number(d.total_linhas||0),size=50,pages=Math.max(1,Math.ceil(total/size)),pageNow=Math.min(auditPage,pages-1);
+ const rows=[...(d.linhas||[])],total=Number(d.total_linhas||0),size=50,pages=Math.max(1,Math.ceil(total/size)),pageNow=Math.min(auditPage,pages-1);
+ rows.sort((a,b)=>{
+  const net=x=>auditMode==='individual'?(x.tipo==='saida'?1:-1)*Number(x.valor||0):Number(x.liquido||0);
+  if(auditSort==='liquido_asc')return net(a)-net(b);
+  if(auditSort==='liquido_desc')return net(b)-net(a);
+  return (auditMode==='individual'?Number(b.valor||0)-Number(a.valor||0):Number(b.movimentado||0)-Number(a.movimentado||0));
+ });
  if(auditMode==='individual'){
   const body=rows.map(r=>`<tr><td>${esc(r.data||'')}</td><td>${r.tipo==='saida'?'<span class="tag bad">Falta</span>':'<span class="tag good">Sobra</span>'}</td><td>${esc(r.sku||'')}</td><td>${esc(r.produto||'')}</td><td>${esc(r.departamento||r.dpto||'')}</td><td class="num">${num(Number(r.quantidade||0))}</td><td class="num">${money(Number(r.valor||0))}</td><td class="num">${r.tipo==='saida'?money(Number(r.valor||0)):'− '+money(Number(r.valor||0))}</td></tr>`).join('');
   return `<div class="grid-summary">${num(total)} movimentos<b>${money(Number(d.resumo?.liquido||0))} líquido</b></div><div class="table-wrap"><table class="data-grid"><thead><tr><th>Data</th><th>Tipo</th><th>SKU</th><th>Produto</th><th>Departamento</th><th class="num">Qtde</th><th class="num">Valor</th><th class="num">Impacto</th></tr></thead><tbody>${body||'<tr><td colspan="8">Nenhum movimento neste filtro.</td></tr>'}</tbody></table></div>${auditPager(pageNow,pages,total)}`;
@@ -130,7 +143,13 @@ async function exportAuditCsv(){
   const r=await request('/rest/v1/rpc/zai_auditorias_periodo',{
    p_loja:activeStore,p_de:$('#from').value,p_ate:$('#to').value,p_dpto:$('#dept').value||null,
    p_tipo:auditType||null,p_busca:auditQuery.trim()||null,p_modo:auditMode,p_limit:50000,p_offset:0
-  }),rows=r.linhas||[];
+  }),rows=[...(r.linhas||[])];
+  rows.sort((a,b)=>{
+   const net=x=>auditMode==='individual'?(x.tipo==='saida'?1:-1)*Number(x.valor||0):Number(x.liquido||0);
+   if(auditSort==='liquido_asc')return net(a)-net(b);
+   if(auditSort==='liquido_desc')return net(b)-net(a);
+   return Number(b.movimentado??b.valor??0)-Number(a.movimentado??a.valor??0);
+  });
   if(auditMode==='individual'){
    csv('auditorias_'+activeStore+'_individual.csv',
     ['Loja','Data','Tipo','SKU','Produto','Departamento','Quantidade','Valor','Impacto líquido','Documento','Observação'],
@@ -147,6 +166,7 @@ function bindAuditPage(){
  $('#auditIndividual').onclick=()=>{auditMode='individual';auditPage=0;auditData=null;auditLoadedKey='';render()};
  $('#auditGrouped').onclick=()=>{auditMode='agrupado';auditPage=0;auditData=null;auditLoadedKey='';render()};
  $('#auditType').onchange=e=>{auditType=e.target.value;auditPage=0;auditData=null;auditLoadedKey='';render()};
+ $('#auditSort').onchange=e=>{auditSort=e.target.value;renderAuditGridOnly()};
  $('#auditSearch').oninput=e=>{auditQuery=e.target.value;auditPage=0;auditData=null;auditLoadedKey='';clearTimeout(auditSearchTimer);auditSearchTimer=setTimeout(()=>{if(page===4)loadAuditData(true)},350)};
  $('#auditExport').onclick=exportAuditCsv;
  if($('#auditPrev'))$('#auditPrev').onclick=()=>{auditPage=Math.max(0,auditPage-1);auditData=null;auditLoadedKey='';render()};

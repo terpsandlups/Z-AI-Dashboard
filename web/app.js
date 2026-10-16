@@ -22,6 +22,109 @@ const TRADE_BRAND_OVERRIDES={
  '74845':'Serramar',
  '72826':'Life','48429':'Life'
 };
+// Metas oficiais da Loja 007, conforme planilhas fornecidas em 16/10/2026.
+// Metas de participação foram informadas com soma de 100,10%; os valores não são normalizados.
+// Quando o backend atualizar as metas, retirar esta camada de compatibilidade sem perder o histórico.
+const OFFICIAL_DEPT_GOALS = {
+ "113": {
+  "meta_perda": null,
+  "meta_participacao": 0.0756
+ },
+ "114": {
+  "meta_perda": 0.01,
+  "meta_participacao": 0.067
+ },
+ "115": {
+  "meta_perda": 0.01,
+  "meta_participacao": 0.002
+ },
+ "116": {
+  "meta_perda": 0.005,
+  "meta_participacao": 0.0216
+ },
+ "117": {
+  "meta_perda": 0.005,
+  "meta_participacao": 0.005
+ },
+ "118": {
+  "meta_perda": 0.005,
+  "meta_participacao": 0.0215
+ },
+ "120": {
+  "meta_perda": 0.05,
+  "meta_participacao": 0.004
+ },
+ "121": {
+  "meta_perda": 0.01,
+  "meta_participacao": 0.0014000000000000002
+ },
+ "123": {
+  "meta_perda": 0.025,
+  "meta_participacao": 0.0506
+ },
+ "130": {
+  "meta_perda": null,
+  "meta_participacao": 0.0055000000000000005
+ },
+ "015": {
+  "meta_perda": 0.03,
+  "meta_participacao": 0.0404
+ },
+ "016": {
+  "meta_perda": 0.025,
+  "meta_participacao": 0.0463
+ },
+ "017": {
+  "meta_perda": 0.008,
+  "meta_participacao": 0.0584
+ },
+ "018": {
+  "meta_perda": 0.002,
+  "meta_participacao": 0.0588
+ },
+ "019": {
+  "meta_perda": 0.005,
+  "meta_participacao": 0.0125
+ },
+ "020": {
+  "meta_perda": 0.005,
+  "meta_participacao": null
+ },
+ "021": {
+  "meta_perda": 0.01,
+  "meta_participacao": 0.1384
+ },
+ "022": {
+  "meta_perda": 0.03,
+  "meta_participacao": 0.157
+ },
+ "023": {
+  "meta_perda": 0.005,
+  "meta_participacao": 0.0434
+ },
+ "025": {
+  "meta_perda": 0.02,
+  "meta_participacao": 0.0966
+ },
+ "026": {
+  "meta_perda": 0.02,
+  "meta_participacao": 0.095
+ }
+};
+function applyOfficialGoals(snapshot){
+ if(snapshot?.loja!=='007')return snapshot;
+ const original=new Map((snapshot.metas||[]).map(r=>[r.codigo,r]));
+ const metas=[...new Set([...original.keys(),...Object.keys(OFFICIAL_DEPT_GOALS)])].map(code=>{
+  const goals=OFFICIAL_DEPT_GOALS[code]||{meta_perda:null,meta_participacao:null};
+  return {...(original.get(code)||{codigo:code,descricao:snapshot.departamentos?.[code]||code,participacao:0,vendas_historicas:0}),...goals};
+ });
+ return {...snapshot,metas,meta_origem:'Planilhas de 16/10/2026',metas_participacao_soma:1.001};
+}
+function departmentOptions(snapshot){
+ const official=new Set((snapshot.metas||[]).filter(r=>r.meta_perda!=null||r.meta_participacao!=null).map(r=>r.codigo));
+ const allowed=official.size?Object.entries(snapshot.departamentos).filter(([k])=>official.has(k)):Object.entries(snapshot.departamentos);
+ return allowed.sort((a,b)=>a[1].localeCompare(b[1],'pt-BR'));
+}
 const BASE=window.ZAI_CONFIG?.supabaseUrl||'',KEY=window.ZAI_CONFIG?.publishableKey||'';
 let activeStore='',accessibleStores=[],requestVersion=0;
 let data=null,page=0,cloud=false,session=null,context=null,pending=null,productPage=0,productQuery='',activeDept='',productStatus='',compareAFrom='',compareATo='',compareBFrom='',compareBTo='',compareDept='',salesProductRows=[],salesProductKey='',salesProductLoading=false,tradeSupplier='',tradeCategory='',tradeBrand='',tradeQuery='';
@@ -37,9 +140,9 @@ async function request(path,body,auth=true){
 function setData(d,isCloud){
  if(d.schema!=='zai-007-v2'||!/^\d{3}$/.test(d.loja)||!Array.isArray(d.perdas)||!d.departamentos||!d.produtos)throw Error('Base analítica incompatível.');
  if(![d.perdas,d.vendas_mensais||[],d.vendas_diarias||[]].every(a=>a.every(r=>Array.isArray(r)&&r.every(x=>typeof x==='string'||typeof x==='number'))))throw Error('Linhas inválidas na base.');
- data=d;cloud=isCloud;pending=null;activeStore=d.loja;salesProductRows=[];salesProductKey='';tradeSupplier='';tradeCategory='';tradeBrand='';tradeQuery='';syncStores();
+ data=applyOfficialGoals(d);cloud=isCloud;pending=null;activeStore=d.loja;salesProductRows=[];salesProductKey='';tradeSupplier='';tradeCategory='';tradeBrand='';tradeQuery='';syncStores();
  $('#sourceBadge').textContent=isCloud?'Supabase · '+d.loja:'Conferência local · não salva na nuvem';$('#refresh').hidden=!isCloud;$('#logout').hidden=!session;$('#loginOpen').textContent=isCloud?'Conta conectada':'Conectar Supabase';
- $('#dept').innerHTML='<option value="">Todos os departamentos</option>'+Object.entries(data.departamentos).sort((a,b)=>a[1].localeCompare(b[1],'pt-BR')).map(([k,v])=>`<option value="${esc(k)}">${esc(k+' · '+v)}</option>`).join('');
+ $('#dept').innerHTML='<option value="">Todos os departamentos</option>'+departmentOptions(data).map(([k,v])=>`<option value="${esc(k)}">${esc(k+' · '+v)}</option>`).join('');
  const dates=[...(d.dias_vendas_completos||[]),...(d.perdas||[]).map(r=>r[0]),...(d.auditorias_diarias_resumo||[]).map(r=>r[0])].filter(x=>/^\d{4}-\d{2}-\d{2}$/.test(x)).sort();
  const latestSales=[...(d.dias_vendas_completos||[])].sort().at(-1),latest=latestSales||dates.at(-1);
  if(latest){$('#from').value=latest.slice(0,7)+'-01';$('#to').value=latest}
@@ -79,7 +182,7 @@ function consolidatedDepartments(from,to,dept=''){
  }
  const meta=ZAI.lossTarget(data);
  return [...map.values()].map(r=>{
-   const consolidated=r.recon+r.faltas-r.sobras,target=(data.metas||[]).find(x=>x.codigo===r.code)?.meta_perda??meta;
+   const consolidated=r.recon+r.faltas-r.sobras,target=(data.metas||[]).find(x=>x.codigo===r.code)?.meta_perda??null;
    return {...r,consolidated,ratio:full.comparable&&r.sales>0?consolidated/r.sales:null,target};
   }).filter(r=>!dept||r.code===dept).sort((a,b)=>b.consolidated-a.consolidated);
 }
@@ -100,10 +203,10 @@ function trend(){
 }
 function targetPanel(op,meta){
  const realized=op.ratio,limit=meta==null||!op.context.salesTotal?null:op.context.salesTotal*meta,delta=realized==null||meta==null?null:realized-meta,progress=realized==null||meta==null||meta===0?0:Math.min(160,realized/meta*100),ok=delta!=null&&delta<=0;
- return `<article class="card target-panel"><div class="target-head"><div><span class="section-kicker">META DE PERDAS</span><h2>Meta × realizado</h2></div><span class="status-chip ${realized==null?'neutral':ok?'good-chip':'bad-chip'}">${realized==null?'Sem base comparável':ok?'Dentro da meta':'Acima da meta'}</span></div><div class="target-values"><div><small>Meta geral</small><strong>${pct(meta)}</strong></div><div><small>Realizado consolidado</small><strong>${pct(realized)}</strong></div><div><small>Desvio</small><strong>${pp(delta)}</strong></div><div><small>Limite em R$</small><strong>${money(limit)}</strong></div></div><div class="target-track" aria-label="Atingimento da meta de perdas"><span class="${ok?'ok':'alert'}" style="width:${progress}%"></span><i style="left:100%" title="Meta"></i></div><p class="small muted">Meta geral configurada para a Loja 007: ${pct(meta)}. Realizado = perdas consolidadas ÷ vendas do mesmo período comparável.</p></article>`;
+ return `<article class="card target-panel"><div class="target-head"><div><span class="section-kicker">META DE PERDAS</span><h2>Meta × realizado</h2></div><span class="status-chip ${realized==null?'neutral':ok?'good-chip':'bad-chip'}">${realized==null?'Sem base comparável':ok?'Dentro da meta':'Acima da meta'}</span></div><div class="target-values"><div><small>Meta geral</small><strong>${pct(meta)}</strong></div><div><small>Realizado consolidado</small><strong>${pct(realized)}</strong></div><div><small>Desvio</small><strong>${pp(delta)}</strong></div><div><small>Limite em R$</small><strong>${money(limit)}</strong></div></div><div class="target-track" aria-label="Atingimento da meta de perdas"><span class="${ok?'ok':'alert'}" style="width:${progress}%"></span><i style="left:100%" title="Meta"></i></div><p class="small muted">Meta aplicável ao filtro selecionado: ${pct(meta)}. Realizado = perdas consolidadas ÷ vendas do mesmo período comparável.</p></article>`;
 }
 function executive(){
- const from=$('#from').value,to=$('#to').value,dept=$('#dept').value,op=operationalPeriod(from,to,dept),c=op.context,meta=ZAI.lossTarget(data),rows=consolidatedDepartments(from,to,dept),cutNote=c.cut?'Comparável até '+c.cut.split('-').reverse().join('/'):'Período selecionado';
+ const from=$('#from').value,to=$('#to').value,dept=$('#dept').value,op=operationalPeriod(from,to,dept),c=op.context,meta=dept?((data.metas||[]).find(x=>x.codigo===dept)?.meta_perda??null):ZAI.lossTarget(data),rows=consolidatedDepartments(from,to,dept),cutNote=c.cut?'Comparável até '+c.cut.split('-').reverse().join('/'):'Período selecionado';
  return `<div class="kpis executive-kpis">${card('Vendas',c.sales.length?money(c.salesTotal):'—',cutNote,true)}${card('Perdas reconhecidas',money(op.recon),'Quebras operacionais')}${card('Perdas desconhecidas',money(op.a.faltas),'Faltas de estoque / inventários')}${card('Sobras de estoque',money(op.a.sobras),'Crédito de inventário')}${card('Perdas consolidadas',money(op.consolidated),'Reconhecidas + faltas − sobras',true)}${card('% consolidadas / vendas',pct(op.ratio),'Meta: '+pct(meta))}</div>
  <div class="executive-grid">${targetPanel(op,meta)}<article class="card"><div class="section-title compact"><div><span class="section-kicker">RANKING</span><h2>Perdas consolidadas por departamento</h2></div></div><p class="desc">Top departamentos por impacto financeiro no período.</p>${bars(rows.filter(r=>r.consolidated>0).slice(0,8).map(r=>[r.name,r.consolidated,money(r.consolidated)+' · '+pct(r.ratio)]),true)}</article></div>
  <article class="card table-section"><div class="section-title compact"><div><span class="section-kicker">VISÃO GERENCIAL</span><h2>Resumo por departamento</h2></div></div><p class="desc">Venda, perdas reconhecidas, inventário e desvio contra a meta de perdas.</p>${table(['Departamento','Vendas','Reconhecidas','Faltas','Sobras','Consolidadas','Realizado','Meta','Desvio'],rows.map(r=>[esc(r.code+' · '+r.name),money(r.sales),money(r.recon),money(r.faltas),money(r.sobras),money(r.consolidated),pct(r.ratio),pct(r.target),r.ratio==null||r.target==null?'—':pp(r.ratio-r.target)]))}</article>`;
@@ -147,7 +250,7 @@ function compare(){
  const ad=consolidatedDepartments(compareAFrom,compareATo,dept),bd=consolidatedDepartments(compareBFrom,compareBTo,dept),map=new Map();
  for(const r of ad)map.set(r.code,{code:r.code,name:r.name,a:r.consolidated,b:0});for(const r of bd){if(!map.has(r.code))map.set(r.code,{code:r.code,name:r.name,a:0,b:0});map.get(r.code).b=r.consolidated}
  const rows=[...map.values()].map(r=>({...r,delta:r.b-r.a})).sort((x,y)=>Math.abs(y.delta)-Math.abs(x.delta));
- const opts='<option value="">Todos os departamentos</option>'+Object.entries(data.departamentos).sort((x,y)=>x[1].localeCompare(y[1],'pt-BR')).map(([k,v])=>`<option value="${esc(k)}" ${k===compareDept?'selected':''}>${esc(k+' · '+v)}</option>`).join('');
+ const opts='<option value="">Todos os departamentos</option>'+departmentOptions(data).map(([k,v])=>`<option value="${esc(k)}" ${k===compareDept?'selected':''}>${esc(k+' · '+v)}</option>`).join('');
  return `<article class="card compare-filter"><div class="section-title compact"><div><span class="section-kicker">ANÁLISE TEMPORAL</span><h2>Comparador de períodos</h2></div></div><p class="desc">Compare qualquer intervalo de datas. A fórmula é a mesma: reconhecidas + faltas − sobras.</p><div class="compare-controls"><label>Período A · de<input id="cmpAFrom" type="date" value="${esc(compareAFrom)}"></label><label>Período A · até<input id="cmpATo" type="date" value="${esc(compareATo)}"></label><span class="compare-vs">VS</span><label>Período B · de<input id="cmpBFrom" type="date" value="${esc(compareBFrom)}"></label><label>Período B · até<input id="cmpBTo" type="date" value="${esc(compareBTo)}"></label><label>Departamento<select id="cmpDept">${opts}</select></label><button class="primary" id="compareApply">Comparar</button></div></article>
  <div class="kpis">${card('Perdas consolidadas · A',money(a.consolidated),compareAFrom+' a '+compareATo)}${card('Perdas consolidadas · B',money(b.consolidated),compareBFrom+' a '+compareBTo,true)}${card('Variação em R$',money(delta),'B − A')}${card('Variação %',pct(deltaPct),'Sobre o período A')}</div>
  <div class="grid2"><article class="card"><h2>Período A</h2>${table(['Indicador','Valor'],[['Vendas',money(a.context.salesTotal)],['Reconhecidas',money(a.recon)],['Faltas',money(a.a.faltas)],['Sobras','− '+money(a.a.sobras)],['Consolidadas',money(a.consolidated)],['% / vendas',pct(a.ratio)]])}</article><article class="card"><h2>Período B</h2>${table(['Indicador','Valor'],[['Vendas',money(b.context.salesTotal)],['Reconhecidas',money(b.recon)],['Faltas',money(b.a.faltas)],['Sobras','− '+money(b.a.sobras)],['Consolidadas',money(b.consolidated)],['% / vendas',pct(b.ratio)]])}</article></div>
@@ -269,7 +372,7 @@ function bindTradePage(){
 }
 function future(){
  if(page===4)return audits();
- if(page===5){const op=operationalPeriod($('#from').value,$('#to').value,$('#dept').value),meta=ZAI.lossTarget(data);return `<div class="kpis">${card('Perdas reconhecidas',money(op.recon),num(op.context.loss.length)+' lançamentos')}${card('Perdas desconhecidas',money(op.a.faltas),'Faltas de estoque')}${card('Sobras de estoque',money(op.a.sobras),'Compensação de inventário')}${card('Perdas consolidadas',money(op.consolidated),'Reconhecidas + faltas − sobras',true)}${card('% consolidadas / vendas',op.ratio==null?'—':pct(op.ratio),'Meta: '+pct(meta))}</div>${targetPanel(op,meta)}`;}
+ if(page===5){const op=operationalPeriod($('#from').value,$('#to').value,$('#dept').value),meta=$('#dept').value?((data.metas||[]).find(x=>x.codigo===$('#dept').value)?.meta_perda??null):ZAI.lossTarget(data);return `<div class="kpis">${card('Perdas reconhecidas',money(op.recon),num(op.context.loss.length)+' lançamentos')}${card('Perdas desconhecidas',money(op.a.faltas),'Faltas de estoque')}${card('Sobras de estoque',money(op.a.sobras),'Compensação de inventário')}${card('Perdas consolidadas',money(op.consolidated),'Reconhecidas + faltas − sobras',true)}${card('% consolidadas / vendas',op.ratio==null?'—':pct(op.ratio),'Meta: '+pct(meta))}</div>${targetPanel(op,meta)}`;}
  if(page===6)return tradePage();
  return '';
 }

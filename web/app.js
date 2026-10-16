@@ -123,7 +123,7 @@ function applyOfficialGoals(snapshot){
 function departmentOptions(snapshot){
  const official=new Set((snapshot.metas||[]).filter(r=>r.meta_perda!=null||r.meta_participacao!=null).map(r=>r.codigo));
  const allowed=official.size?Object.entries(snapshot.departamentos).filter(([k])=>official.has(k)):Object.entries(snapshot.departamentos);
- return allowed.sort((a,b)=>a[1].localeCompare(b[1],'pt-BR'));
+ return (allowed.length?allowed:Object.entries(snapshot.departamentos)).sort((a,b)=>a[1].localeCompare(b[1],'pt-BR'));
 }
 const BASE=window.ZAI_CONFIG?.supabaseUrl||'',KEY=window.ZAI_CONFIG?.publishableKey||'';
 let activeStore='',accessibleStores=[],requestVersion=0;

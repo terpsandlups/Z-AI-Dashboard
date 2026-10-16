@@ -9,6 +9,24 @@ const asDateStart=v=>String(v||'').length===7?String(v)+'-01':String(v||'');
 const asDateEnd=v=>String(v||'').length===7?monthEnd(String(v)):String(v||'');
 const dateSpan=(a,b)=>{const out=[],d=new Date(a+'T12:00:00Z'),end=new Date(b+'T12:00:00Z');while(d<=end&&out.length<5000){out.push(d.toISOString().slice(0,10));d.setUTCDate(d.getUTCDate()+1)}return out};
 const lossTarget=data=>{const v=data?.baseline?.meta_perda;return typeof v==='number'&&Number.isFinite(v)&&v>=0&&v<=1?v:null};
+const departmentName=(data,code)=>{
+ const raw=String(data?.departamentos?.[code]||'').trim();
+ return !raw||/^departamento\\s+\\d+$/i.test(raw)?'Descrição pendente':raw;
+};
+const departmentTarget=(data,code)=>{
+ const row=(data?.metas||[]).find(x=>String(x.codigo)===String(code));
+ const v=row?.meta_perda;
+ return typeof v==='number'&&Number.isFinite(v)&&v>=0&&v<=1?v:null;
+};
+const lossClass=reason=>{
+ const n=String(reason??'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase();
+ if(n.includes('vencid'))return 'Vencido';
+ if(n.includes('avari'))return 'Avariado';
+ if(n.includes('deterior'))return 'Deteriorado';
+ if(n.includes('furto'))return 'Furto';
+ if(!n.trim()||n.includes('nao informado'))return 'Não informado';
+ return 'Outros';
+};
 const dailyGoal=(data,dept='')=>{const v=data?.baseline?.meta_diaria,w=dept?(data.metas||[]).find(x=>x.codigo===dept)?.participacao:1;return typeof v==='number'&&Number.isFinite(v)&&v>=0&&typeof w==='number'&&Number.isFinite(w)&&w>=0&&w<=1?Math.round(v*w*100)/100:null};
 
 function select(data,from,to,dept=''){
@@ -57,7 +75,7 @@ function select(data,from,to,dept=''){
  };
 }
 function departmentRows(data,c){
- const map=new Map();function get(k){if(!map.has(k))map.set(k,{code:k,name:data.departamentos[k]||k,sales:0,loss:0,goal:(data.metas||[]).find(x=>x.codigo===k)});return map.get(k)}
+ const map=new Map();function get(k){if(!map.has(k))map.set(k,{code:k,name:departmentName(data,k),sales:0,loss:0,goal:(data.metas||[]).find(x=>x.codigo===k)});return map.get(k)}
  c.sales.forEach(r=>get(r[2]).sales+=Number(r[4]));c.loss.forEach(r=>get(r[2]).loss+=Number(r[5]));
  return [...map.values()].map(r=>({...r,ratio:c.comparable&&r.sales>0?r.loss/r.sales:null,target:r.goal?.meta_perda??null})).sort((a,b)=>b.sales-a.sales);
 }
@@ -84,6 +102,6 @@ function validateLossImport(d,data){
  }
  return d.rows;
 }
-const api={dailyGoal,lossTarget,sum,days,monthEnd,dateList,dateSpan,monthRange,asDateStart,asDateEnd,select,departmentRows,departmentAnalytics,weekdays,validateLossImport};
+const api={dailyGoal,lossTarget,departmentName,departmentTarget,lossClass,sum,days,monthEnd,dateList,dateSpan,monthRange,asDateStart,asDateEnd,select,departmentRows,departmentAnalytics,weekdays,validateLossImport};
 root.ZAI=api;if(typeof module!=='undefined')module.exports=api;
 })(typeof window==='undefined'?globalThis:window);

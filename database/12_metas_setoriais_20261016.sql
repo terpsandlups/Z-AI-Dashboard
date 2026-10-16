@@ -29,8 +29,8 @@ WITH valores(codigo, meta_perda, meta_participacao) AS (
   CASE
     WHEN v.codigo IS NOT NULL THEN
       jsonb_set(
-       jsonb_set(item, '{meta_perda}', to_jsonb(v.meta_perda), true),
-       '{meta_participacao}', to_jsonb(v.meta_participacao), true)
+       jsonb_set(item, '{meta_perda}', coalesce(to_jsonb(v.meta_perda),'null'::jsonb), true),
+       '{meta_participacao}', coalesce(to_jsonb(v.meta_participacao),'null'::jsonb), true)
     ELSE jsonb_set(
        jsonb_set(item, '{meta_perda}', 'null'::jsonb, true),
        '{meta_participacao}', 'null'::jsonb, true)

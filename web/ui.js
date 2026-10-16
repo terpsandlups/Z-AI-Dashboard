@@ -1,6 +1,6 @@
 /* Shared shell and operational components. Data/metrics remain in app.js/core.js. */
 let lossMode='individual',lossQuery='',lossReason='',lossStatus='',lossKind='',lossPage=0,lossSort='valor',lossDirection=-1;
-let auditMode='agrupado',auditType='',auditQuery='',auditSort='movimentado',auditSortDirection=-1,auditPage=0,auditData=null,auditLoadedKey='',auditLoading=false,auditSearchTimer=null;
+let auditMode='agrupado',auditType='',auditQuery='',auditSort='faltas_sobras',auditSortDirection=-1,auditPage=0,auditData=null,auditLoadedKey='',auditLoading=false,auditSearchTimer=null;
 function syncStores(){
  const stores=cloud?accessibleStores:(data?[{codigo:data.loja,nome:data.nome}]:[]);
  $('#storeSelect').innerHTML=stores.length?stores.map(s=>`<option value="${esc(s.codigo)}">${esc(s.codigo+' · '+s.nome)}</option>`).join(''):'<option value="">Selecione a loja</option>';
@@ -92,10 +92,11 @@ function audits(){
     <select id="auditType"><option value="">Sobras e faltas</option><option value="saida" ${auditType==='saida'?'selected':''}>Somente faltas</option><option value="entrada" ${auditType==='entrada'?'selected':''}>Somente sobras</option></select>
    </div>
    <div class="audit-sortline"><label>Ordenar ${auditMode==='agrupado'?'agrupamento':'movimentos'} <select id="auditSort">
+  <option value="faltas_sobras" ${auditSort==='faltas_sobras'?'selected':''}>Faltas primeiro → depois sobras</option>
   <option value="movimentado" ${auditSort==='movimentado'?'selected':''}>Maior movimentação</option>
   <option value="liquido_desc" ${auditSort==='liquido_desc'?'selected':''}>Maior falta líquida</option>
   <option value="liquido_asc" ${auditSort==='liquido_asc'?'selected':''}>Maior sobra líquida</option>
-  </select></label><span class="small muted">Ordenação global no modo agrupado; no individual, ordena somente a página.</span></div>
+  </select></label><span class="small muted">${auditMode==='agrupado'?'Padrão: todas as faltas do maior para o menor; depois todas as sobras do maior para o menor.':'No individual, a ordenação vale para a página carregada.'}</span></div>
  <div id="auditGrid">${auditGridHtml(fresh?d:null)}</div>
    <p class="small muted">Saída de estoque = falta. Entrada de estoque = sobra. O modo agrupado consolida recorrências do mesmo SKU/departamento no período.</p>
   </article>`;
@@ -106,6 +107,18 @@ function auditGridHtml(d){
  const rows=[...(d.linhas||[])],total=Number(d.total_linhas||0),size=50,pages=Math.max(1,Math.ceil(total/size)),pageNow=Math.min(auditPage,pages-1);
  rows.sort((a,b)=>{
   const net=x=>auditMode==='individual'?(x.tipo==='saida'?1:-1)*Number(x.valor||0):Number(x.liquido||0);
+  if(auditSort==='faltas_sobras'){
+   if(auditMode==='individual'){
+    const ga=a.tipo==='saida'?0:1,gb=b.tipo==='saida'?0:1;
+    if(ga!==gb)return ga-gb;
+    return Number(b.valor||0)-Number(a.valor||0);
+   }
+   const af=Number(a.faltas||0),bf=Number(b.faltas||0),as=Number(a.sobras||0),bs=Number(b.sobras||0);
+   const ga=af>0?0:1,gb=bf>0?0:1;
+   if(ga!==gb)return ga-gb;
+   if(ga===0)return bf-af||bs-as;
+   return bs-as||bf-af;
+  }
   if(auditSort==='liquido_asc')return net(a)-net(b);
   if(auditSort==='liquido_desc')return net(b)-net(a);
   return (auditMode==='individual'?Number(b.valor||0)-Number(a.valor||0):Number(b.movimentado||0)-Number(a.movimentado||0));
@@ -153,6 +166,18 @@ async function exportAuditCsv(){
   }),rows=[...(r.linhas||[])];
   rows.sort((a,b)=>{
    const net=x=>auditMode==='individual'?(x.tipo==='saida'?1:-1)*Number(x.valor||0):Number(x.liquido||0);
+   if(auditSort==='faltas_sobras'){
+    if(auditMode==='individual'){
+     const ga=a.tipo==='saida'?0:1,gb=b.tipo==='saida'?0:1;
+     if(ga!==gb)return ga-gb;
+     return Number(b.valor||0)-Number(a.valor||0);
+    }
+    const af=Number(a.faltas||0),bf=Number(b.faltas||0),as=Number(a.sobras||0),bs=Number(b.sobras||0);
+    const ga=af>0?0:1,gb=bf>0?0:1;
+    if(ga!==gb)return ga-gb;
+    if(ga===0)return bf-af||bs-as;
+    return bs-as||bf-af;
+   }
    if(auditSort==='liquido_asc')return net(a)-net(b);
    if(auditSort==='liquido_desc')return net(b)-net(a);
    return Number(b.movimentado??b.valor??0)-Number(a.movimentado??a.valor??0);

@@ -440,8 +440,11 @@ function tradeSupplierRows(items){
   const code=String(r.fornecedor_codigo||''),cat=tradeCanonical(r.categoria),brands=tradeRuleBrands(r.marca_produto);
   if(tradeSupplier&&code!==tradeSupplier)continue;
   if(tradeCategory&&cat!==tradeCategory)continue;
-  if(tradeBrand&&!brands.includes(tradeBrand))continue;
-  if(q&&!hnorm([code,r.fornecedor,r.fornecedor_referencia,r.marca_produto,r.tratativa].join(' ')).includes(q))continue;
+  // Item-level filters are already applied in "items". Preserve suppliers with matching items
+  // even if the configured brand list omits a product brand or query only matches SKU/product.
+  const matchingItems=items.filter(x=>String(x.fornecedor_codigo||'')===code);
+  if(tradeBrand&&!brands.includes(tradeBrand)&&!matchingItems.length)continue;
+  if(q&&!matchingItems.length&&!hnorm([code,r.fornecedor,r.fornecedor_referencia,r.marca_produto,r.tratativa].join(' ')).includes(q))continue;
   map.set(code,{fornecedor_codigo:code,fornecedor:r.fornecedor||r.fornecedor_referencia||'Sem nome',fornecedor_referencia:r.fornecedor_referencia||'',categoria:cat,tratativa:r.tratativa||'Sem tratativa cadastrada',forma:r.forma||'',marca_produto:r.marca_produto||'',fisico_virtual:r.fisico_virtual||'',skus:new Set(),quantidade:0,valor:0,marcas:new Set(brands)});
  }
  for(const x of items){

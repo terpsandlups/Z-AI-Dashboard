@@ -11,7 +11,7 @@ const dateSpan=(a,b)=>{const out=[],d=new Date(a+'T12:00:00Z'),end=new Date(b+'T
 const lossTarget=data=>{const v=data?.baseline?.meta_perda;return typeof v==='number'&&Number.isFinite(v)&&v>=0&&v<=1?v:null};
 const departmentName=(data,code)=>{
  const raw=String(data?.departamentos?.[code]||'').trim();
- return !raw||/^departamento\\s+\\d+$/i.test(raw)?'Descrição pendente':raw;
+ return !raw||/^departamento\s+\d+$/i.test(raw)?'Descrição pendente':raw;
 };
 const departmentTarget=(data,code)=>{
  const row=(data?.metas||[]).find(x=>String(x.codigo)===String(code));
@@ -19,7 +19,7 @@ const departmentTarget=(data,code)=>{
  return typeof v==='number'&&Number.isFinite(v)&&v>=0&&v<=1?v:null;
 };
 const lossClass=reason=>{
- const n=String(reason??'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase();
+ const n=String(reason??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
  if(n.includes('vencid'))return 'Vencido';
  if(n.includes('avari'))return 'Avariado';
  if(n.includes('deterior'))return 'Deteriorado';

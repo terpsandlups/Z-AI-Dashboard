@@ -57,7 +57,7 @@ function bindLossGrid(){
 }
 function auditRequestKey(){
  if(!data)return '';
- return [activeStore,$('#from')?.value||'',$('#to')?.value||'',$('#dept')?.value||'',auditType,auditQuery.trim(),auditMode,auditPage].join('|');
+ return [activeStore,$('#from')?.value||'',$('#to')?.value||'',$('#dept')?.value||'',auditType,auditQuery.trim(),auditMode,auditMode==='agrupado'?'todos':auditPage].join('|');
 }
 function auditFallback(){
  const op=operationalPeriod($('#from').value,$('#to').value,$('#dept').value),a=op.a;
@@ -95,7 +95,7 @@ function audits(){
   <option value="movimentado" ${auditSort==='movimentado'?'selected':''}>Maior movimentação</option>
   <option value="liquido_desc" ${auditSort==='liquido_desc'?'selected':''}>Maior falta líquida</option>
   <option value="liquido_asc" ${auditSort==='liquido_asc'?'selected':''}>Maior sobra líquida</option>
-  </select></label><span class="small muted">Ordenação visual nesta página; exportação CSV ordenada no conjunto completo.</span></div>
+  </select></label><span class="small muted">Ordenação global no modo agrupado; no individual, ordena somente a página.</span></div>
  <div id="auditGrid">${auditGridHtml(fresh?d:null)}</div>
    <p class="small muted">Saída de estoque = falta. Entrada de estoque = sobra. O modo agrupado consolida recorrências do mesmo SKU/departamento no período.</p>
   </article>`;
@@ -111,10 +111,10 @@ function auditGridHtml(d){
   return (auditMode==='individual'?Number(b.valor||0)-Number(a.valor||0):Number(b.movimentado||0)-Number(a.movimentado||0));
  });
  if(auditMode==='individual'){
-  const body=rows.map(r=>`<tr><td>${esc(r.data||'')}</td><td>${r.tipo==='saida'?'<span class="tag bad">Falta</span>':'<span class="tag good">Sobra</span>'}</td><td>${esc(r.sku||'')}</td><td>${esc(r.produto||'')}</td><td>${esc(r.departamento||r.dpto||'')}</td><td class="num">${num(Number(r.quantidade||0))}</td><td class="num">${money(Number(r.valor||0))}</td><td class="num">${r.tipo==='saida'?money(Number(r.valor||0)):'− '+money(Number(r.valor||0))}</td></tr>`).join('');
+  const body=(auditMode==='individual'?rows:rows.slice(pageNow*size,(pageNow+1)*size)).map(r=>`<tr><td>${esc(r.data||'')}</td><td>${r.tipo==='saida'?'<span class="tag bad">Falta</span>':'<span class="tag good">Sobra</span>'}</td><td>${esc(r.sku||'')}</td><td>${esc(r.produto||'')}</td><td>${esc(r.departamento||r.dpto||'')}</td><td class="num">${num(Number(r.quantidade||0))}</td><td class="num">${money(Number(r.valor||0))}</td><td class="num">${r.tipo==='saida'?money(Number(r.valor||0)):'− '+money(Number(r.valor||0))}</td></tr>`).join('');
   return `<div class="grid-summary">${num(total)} movimentos<b>${money(Number(d.resumo?.liquido||0))} líquido</b></div><div class="table-wrap"><table class="data-grid"><thead><tr><th>Data</th><th>Tipo</th><th>SKU</th><th>Produto</th><th>Departamento</th><th class="num">Qtde</th><th class="num">Valor</th><th class="num">Impacto</th></tr></thead><tbody>${body||'<tr><td colspan="8">Nenhum movimento neste filtro.</td></tr>'}</tbody></table></div>${auditPager(pageNow,pages,total)}`;
  }
- const body=rows.map(r=>`<tr><td>${esc(r.sku||'')}</td><td>${esc(r.produto||'')}</td><td>${esc(r.departamento||r.dpto||'')}</td><td class="num">${num(Number(r.ocorrencias||0))}</td><td class="num">${num(Number(r.dias||0))}</td><td class="num">${money(Number(r.faltas||0))}</td><td class="num">${money(Number(r.sobras||0))}</td><td class="num">${money(Number(r.liquido||0))}</td></tr>`).join('');
+ const body=rows.slice(pageNow*size,(pageNow+1)*size).map(r=>`<tr><td>${esc(r.sku||'')}</td><td>${esc(r.produto||'')}</td><td>${esc(r.departamento||r.dpto||'')}</td><td class="num">${num(Number(r.ocorrencias||0))}</td><td class="num">${num(Number(r.dias||0))}</td><td class="num">${money(Number(r.faltas||0))}</td><td class="num">${money(Number(r.sobras||0))}</td><td class="num">${money(Number(r.liquido||0))}</td></tr>`).join('');
  return `<div class="grid-summary">${num(total)} produtos/departamentos<b>${money(Number(d.resumo?.liquido||0))} líquido</b></div><div class="table-wrap"><table class="data-grid"><thead><tr><th>SKU</th><th>Produto</th><th>Departamento</th><th class="num">Ocorrências</th><th class="num">Dias</th><th class="num">Faltas</th><th class="num">Sobras</th><th class="num">Resultado líquido</th></tr></thead><tbody>${body||'<tr><td colspan="8">Nenhum item neste filtro.</td></tr>'}</tbody></table></div>${auditPager(pageNow,pages,total)}`;
 }
 function auditPager(pageNow,pages,total){
@@ -129,14 +129,21 @@ async function loadAuditData(force=false){
  try{
   const r=await request('/rest/v1/rpc/zai_auditorias_periodo',{
    p_loja:activeStore,p_de:$('#from').value,p_ate:$('#to').value,p_dpto:$('#dept').value||null,
-   p_tipo:auditType||null,p_busca:auditQuery.trim()||null,p_modo:auditMode,p_limit:50,p_offset:auditPage*50
+   p_tipo:auditType||null,p_busca:auditQuery.trim()||null,p_modo:auditMode,p_limit:auditMode==='agrupado'?50000:50,p_offset:auditMode==='agrupado'?0:auditPage*50
   });
   if(page!==4||key!==auditRequestKey())return;
   auditData=r;auditLoadedKey=key;
  }catch(e){msg('Auditorias: '+e.message,true);auditData=null;auditLoadedKey='';}
  finally{auditLoading=false;if(page===4)render();}
 }
-function renderAuditGridOnly(){if($('#auditGrid'))$('#auditGrid').innerHTML=auditGridHtml(auditData&&auditLoadedKey===auditRequestKey()?auditData:null)}
+function renderAuditGridOnly(){
+ if($('#auditGrid'))$('#auditGrid').innerHTML=auditGridHtml(auditData&&auditLoadedKey===auditRequestKey()?auditData:null);
+ bindAuditPager();
+}
+function bindAuditPager(){
+ if($('#auditPrev'))$('#auditPrev').onclick=()=>{auditPage=Math.max(0,auditPage-1);if(auditMode==='individual'){auditData=null;auditLoadedKey=''}render()};
+ if($('#auditNext'))$('#auditNext').onclick=()=>{auditPage++;if(auditMode==='individual'){auditData=null;auditLoadedKey=''}render()};
+}
 async function exportAuditCsv(){
  try{
   msg('Preparando CSV de auditorias…');
@@ -166,11 +173,10 @@ function bindAuditPage(){
  $('#auditIndividual').onclick=()=>{auditMode='individual';auditPage=0;auditData=null;auditLoadedKey='';render()};
  $('#auditGrouped').onclick=()=>{auditMode='agrupado';auditPage=0;auditData=null;auditLoadedKey='';render()};
  $('#auditType').onchange=e=>{auditType=e.target.value;auditPage=0;auditData=null;auditLoadedKey='';render()};
- $('#auditSort').onchange=e=>{auditSort=e.target.value;renderAuditGridOnly()};
+ $('#auditSort').onchange=e=>{auditSort=e.target.value;render()};
  $('#auditSearch').oninput=e=>{auditQuery=e.target.value;auditPage=0;auditData=null;auditLoadedKey='';clearTimeout(auditSearchTimer);auditSearchTimer=setTimeout(()=>{if(page===4)loadAuditData(true)},350)};
  $('#auditExport').onclick=exportAuditCsv;
- if($('#auditPrev'))$('#auditPrev').onclick=()=>{auditPage=Math.max(0,auditPage-1);auditData=null;auditLoadedKey='';render()};
- if($('#auditNext'))$('#auditNext').onclick=()=>{auditPage++;auditData=null;auditLoadedKey='';render()};
+ bindAuditPager();
  loadAuditData();
 }
 

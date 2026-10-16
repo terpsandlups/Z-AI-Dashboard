@@ -216,7 +216,7 @@ function lossKindTotals(from,to,dept=''){
  return m;
 }
 function kindChart(a,b=null){
- const labels=LOSS_KIN,all=labels.map(([k])=>Math.max(Math.abs(a[k]||0),Math.abs(b?.[k]||0),1)),max=Math.max(...all);
+ const labels=LOSS_KINDS,all=labels.map(([k])=>Math.max(Math.abs(a[k]||0),Math.abs(b?.[k]||0),1)),max=Math.max(...all);
  return '<div class="comparison-bars">'+labels.map(([kind,name])=>{
   const v=Number(a[kind]||0),w=Number(b?.[kind]||0);
   return '<button type="button" class="loss-kind-chart" data-loss-kind="'+kind+'" title="Abrir detalhamento de '+name+'"><span class="comparison-title">'+name+'</span>'+

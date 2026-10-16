@@ -127,7 +127,7 @@ function departmentOptions(snapshot){
 }
 const BASE=window.ZAI_CONFIG?.supabaseUrl||'',KEY=window.ZAI_CONFIG?.publishableKey||'';
 let activeStore='',accessibleStores=[],requestVersion=0;
-let data=null,page=0,cloud=false,session=null,context=null,pending=null,productPage=0,productQuery='',activeDept='',productStatus='',compareAFrom='',compareATo='',compareBFrom='',compareBTo='',compareDept='',salesProductRows=[],salesProductKey='',salesProductLoading=false,tradeSupplier='',tradeCategory='',tradeBrand='',tradeQuery='';
+let data=null,page=0,cloud=false,session=null,context=null,pending=null,productPage=0,productQuery='',activeDept='',productStatus='',compareAFrom='',compareATo='',compareBFrom='',compareBTo='',compareDept='',salesProductRows=[],salesProductKey='',salesProductLoading=false,tradeSupplier='',tradeCategory='',tradeBrand='',tradeQuery='',consolidatedKind='';
 function msg(s,error=false){$('#message').innerHTML=s?`<div class="notice ${error?'error':'info'}">${esc(s)}</div>`:''}
 function download(filename,text,type='application/json'){const u=URL.createObjectURL(new Blob([text],{type})),a=document.createElement('a');a.href=u;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(u),3000)}
 function csv(name,headers,rows){const cell=v=>'"'+String(v??'').replace(/^[=+@-]/,"'").replace(/"/g,'""')+'"';download(name,'\ufeff'+[headers,...rows].map(r=>r.map(cell).join(';')).join('\r\n'),'text/csv;charset=utf-8')}
@@ -215,6 +215,68 @@ function lossKindTotals(from,to,dept=''){
  c.loss.forEach(r=>m[lossKindOf(r[3])]+=Number(r[5]));
  return m;
 }
+function consolidatedKindTotals(from,to,dept=''){
+ const c=ZAI.select(data,from,to,dept),a=auditForPeriod(from,to,dept,c.cut),m={vencidos:0,avariados:0,deteriorados:0,outros:0,faltas:a.faltas,sobras:a.sobras};
+ c.loss.forEach(r=>m[lossKindOf(r[3])]+=Number(r[5]));
+ return m;
+}
+const CONSOLIDATED_KINDS=[
+ ['vencidos','Vencidos'],['avariados','Avariados'],['deteriorados','Deteriorados'],
+ ['faltas','Faltas de estoque'],['sobras','Sobras de estoque'],['outros','Outros reconhecidos']
+];
+function consolidatedKindChart(values){
+ const max=Math.max(...CONSOLIDATED_KINDS.map(([k])=>Math.abs(Number(values[k]||0))),1);
+ return '<div class="consolidated-kind-chart">'+CONSOLIDATED_KINDS.map(([k,label])=>{
+  const v=Number(values[k]||0),credit=k==='sobras',selected=consolidatedKind===k;
+  return '<button type="button" class="consolidated-kind '+(credit?'credit ':'')+(selected?'selected':'')+'" data-consolidated-kind="'+k+'">'+
+    '<span><b>'+label+'</b><small>'+(credit?'Crédito de inventário':'Impacto de perda')+'</small></span>'+
+    '<i><em style="width:'+(Math.abs(v)/max*100)+'%"></em></i>'+
+    '<strong>'+(credit?'− ':'')+money(v)+'</strong></button>';
+ }).join('')+'</div>';
+}
+function consolidatedTypeRows(from,to,type,dept=''){
+ if(!type)return consolidatedDepartments(from,to,dept).map(r=>({...r,value:r.consolidated}));
+ const full=ZAI.select(data,from,to,''),start=full.start,end=full.end,map=new Map(),get=code=>{
+  if(!map.has(code))map.set(code,{code,name:data.departamentos[code]||code,sales:0,value:0});
+  return map.get(code);
+ };
+ full.sales.forEach(r=>get(r[2]).sales+=Number(r[4]));
+ if(type==='faltas'||type==='sobras'){
+  for(const r of (data?.auditorias_diarias_resumo||[])){
+   if(r[0]<start||r[0]>end||(full.cut&&r[0]>full.cut))continue;
+   if((type==='faltas'&&r[1]!=='saida')||(type==='sobras'&&r[1]!=='entrada'))continue;
+   get(r[2]).value+=Number(r[4]);
+  }
+ }else{
+  for(const r of full.loss){
+   if(lossKindOf(r[3])!==type)continue;
+   get(r[2]).value+=Number(r[5]);
+  }
+ }
+ return [...map.values()].filter(r=>(!dept||r.code===dept)&&r.value!==0)
+  .map(r=>({...r,ratio:r.sales>0?r.value/r.sales:null}))
+  .sort((a,b)=>Math.abs(b.value)-Math.abs(a.value));
+}
+function dailySalesGoalChart(){
+ const dept=$('#dept').value,goal=ZAI.dailyGoal(data,dept),start=context.start,end=context.end,covered=new Set(data.dias_vendas_completos||[]),map=new Map();
+ for(const r of (data.vendas_diarias_resumo||[])){
+  if(r[0]<start||r[0]>end||!covered.has(r[0])||(dept&&r[1]!==dept))continue;
+  map.set(r[0],(map.get(r[0])||0)+Number(r[2]));
+ }
+ const days=ZAI.dateSpan(start,end).filter(d=>covered.has(d));
+ if(!days.length||goal==null)return '<div class="notice">Sem base diária ou meta diária disponível para este filtro.</div>';
+ const values=days.map(d=>({date:d,actual:map.get(d)||0})),max=Math.max(goal,...values.map(x=>x.actual),1),W=Math.max(760,values.length*34),H=250,L=58,R=24,T=24,B=46;
+ const x=i=>values.length===1?(W/2):L+(W-L-R)*(i/(values.length-1)),y=v=>H-B-(H-B-T)*(v/max),labels=Math.max(1,Math.ceil(values.length/10));
+ const path=values.map((p,i)=>(i?'L':'M')+x(i)+','+y(p.actual)).join(' ');
+ return '<div class="daily-chart-scroll"><svg class="daily-sales-chart" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Meta diária de vendas versus realizado">'+
+  [0,.5,1].map(t=>'<line x1="'+L+'" x2="'+(W-R)+'" y1="'+y(t*max)+'" y2="'+y(t*max)+'" class="daily-grid"/><text x="'+(L-8)+'" y="'+(y(t*max)+3)+'" text-anchor="end">'+num(t*max/1000)+'k</text>').join('')+
+  '<line x1="'+L+'" x2="'+(W-R)+'" y1="'+y(goal)+'" y2="'+y(goal)+'" class="daily-goal-line"/>'+
+  '<text x="'+(W-R)+'" y="'+(y(goal)-7)+'" text-anchor="end" class="daily-goal-label">Meta '+money(goal)+'</text>'+
+  '<path d="'+path+'" class="daily-actual-line"/>'+
+  values.map((p,i)=>'<circle class="daily-point '+(p.actual>=goal?'hit':'miss')+'" data-sales-day="'+p.date+'" cx="'+x(i)+'" cy="'+y(p.actual)+'" r="5"><title>'+p.date.split('-').reverse().join('/')+' · Real '+money(p.actual)+' · Meta '+money(goal)+' · '+pct(goal>0?p.actual/goal:null)+'</title></circle>'+
+    (i%labels===0||i===values.length-1?'<text x="'+x(i)+'" y="'+(H-18)+'" text-anchor="middle" class="daily-date">'+p.date.slice(8,10)+'/'+p.date.slice(5,7)+'</text>':'')).join('')+
+  '</svg></div><div class="legend"><span><i class="dot daily-actual-dot"></i>Realizado</span><span><i class="dot daily-goal-dot"></i>Meta diária</span><span class="muted">Clique em um ponto para abrir aquele dia.</span></div>';
+}
 function kindChart(a,b=null){
  const labels=LOSS_KINDS,all=labels.map(([k])=>Math.max(Math.abs(a[k]||0),Math.abs(b?.[k]||0),1)),max=Math.max(...all);
  return '<div class="comparison-bars">'+labels.map(([kind,name])=>{
@@ -280,7 +342,8 @@ function targets(){
 function sales(){const c=context,w=ZAI.weekdays(data,c,$('#dept').value),da=departmentAnalyticsContext(),r=da.rows;
  return `<div class="kpis">${card('Faturamento',c.sales.length?money(c.salesTotal):'—','Receita no período selecionado',true)}${card('Meta de vendas',money(c.goal),num(c.days)+' dias comparáveis')}${card('Média diária',c.salesDays.size?money(c.salesTotal/c.salesDays.size):'—',num(c.salesDays.size)+' dias cobertos')}${card('Departamentos com venda',num(r.filter(x=>x.sales>0).length),'No filtro atual')}</div>
  <div class="grid2"><article class="card"><h2>Vendas por departamento</h2><p class="desc">Top 10 por faturamento no intervalo exato.</p>${bars(r.filter(x=>x.sales>0).slice(0,10).map(x=>[x.name,x.sales]))}</article><article class="card"><h2>Média por dia da semana</h2><p class="desc">Base diária do período selecionado.</p>${w.some(x=>x.days)?bars(w.map((x,i)=>[['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'][i]+' · '+x.days+' dias',x.mean||0,money(x.mean)])):'<div class="notice">Sem cobertura diária suficiente para este intervalo.</div>'}</article></div>${departmentFocus(r)}<article class="card"><h2>Participação por departamento</h2><p class="desc">Venda do departamento ÷ faturamento total da loja no mesmo período.</p>${table(['Departamento','Vendas','Meta participação','Participação real','Desvio p.p.'],r.map(x=>{const goal=(data.metas||[]).find(g=>g.codigo===x.code)?.meta_participacao??null;return [esc(x.code+' · '+x.name),money(x.sales),pct(goal),pct(x.salesShare),goal==null||x.salesShare==null?'—':pp(x.salesShare-goal)]}))}</article>${targets()}
- <div class="section-title"><h2>Departamento → Produto</h2><button id="salesCsv">Exportar produtos CSV</button></div><article class="card"><div class="searchrow"><input id="productSearch" placeholder="Buscar SKU ou produto" value="${esc(productQuery)}"><select id="productStatus"><option value="">Todos os status</option><option>Ativo</option><option>Inativo</option><option>Nao informado</option></select></div><div id="products"></div></article>`;
+ <article class="card"><div class="section-title compact"><div><span class="section-kicker">DIA A DIA</span><h2>Meta diária × realizado</h2></div></div><p class="desc">A meta diária da loja é distribuída pelo percentual oficial do departamento quando houver filtro setorial.</p>${dailySalesGoalChart()}</article>
+  <div class="section-title"><h2>Departamento → Produto</h2><button id="salesCsv">Exportar produtos CSV</button></div><article class="card"><div class="searchrow"><input id="productSearch" placeholder="Buscar SKU ou produto" value="${esc(productQuery)}"><select id="productStatus"><option value="">Todos os status</option><option>Ativo</option><option>Inativo</option><option>Nao informado</option></select></div><div id="products"></div></article>`;
 }
 function products(){
  const q=productQuery.toLocaleLowerCase('pt-BR');
@@ -437,7 +500,15 @@ function bindTradePage(){
 }
 function future(){
  if(page===4)return audits();
- if(page===5){const op=operationalPeriod($('#from').value,$('#to').value,$('#dept').value),meta=$('#dept').value?((data.metas||[]).find(x=>x.codigo===$('#dept').value)?.meta_perda??null):ZAI.lossTarget(data);return `<div class="kpis">${card('Perdas reconhecidas',money(op.recon),num(op.context.loss.length)+' lançamentos')}${card('Perdas desconhecidas',money(op.a.faltas),'Faltas de estoque')}${card('Sobras de estoque',money(op.a.sobras),'Compensação de inventário')}${card('Perdas consolidadas',money(op.consolidated),'Reconhecidas + faltas − sobras',true)}${card('% consolidadas / vendas',op.ratio==null?'—':pct(op.ratio),'Meta: '+pct(meta))}</div>${targetPanel(op,meta)}`;}
+ if(page===5){
+  const from=$('#from').value,to=$('#to').value,dept=$('#dept').value,op=operationalPeriod(from,to,dept),meta=dept?((data.metas||[]).find(x=>x.codigo===dept)?.meta_perda??null):ZAI.lossTarget(data),totals=consolidatedKindTotals(from,to,dept),typeRows=consolidatedTypeRows(from,to,consolidatedKind,dept);
+  const options='<option value="">Perdas consolidadas · todas</option>'+CONSOLIDATED_KINDS.map(([k,n])=>'<option value="'+k+'" '+(consolidatedKind===k?'selected':'')+'>'+n+'</option>').join('');
+  const typeLabel=consolidatedKind?(CONSOLIDATED_KINDS.find(x=>x[0]===consolidatedKind)?.[1]||consolidatedKind):'Perdas consolidadas';
+  return `<div class="kpis">${card('Perdas reconhecidas',money(op.recon),num(op.context.loss.length)+' lançamentos')}${card('Perdas desconhecidas',money(op.a.faltas),'Faltas de estoque')}${card('Sobras de estoque',money(op.a.sobras),'Compensação de inventário')}${card('Perdas consolidadas',money(op.consolidated),'Reconhecidas + faltas − sobras',true)}${card('% consolidadas / vendas',op.ratio==null?'—':pct(op.ratio),'Meta: '+pct(meta))}</div>
+  ${targetPanel(op,meta)}
+  <article class="card"><div class="section-title compact"><div><span class="section-kicker">CONSOLIDADO GERAL</span><h2>Tipos de perdas e créditos</h2></div><label class="inline-filter">Tipo<select id="consolidatedKindFilter">${options}</select></label></div><p class="desc">Vencidos, avariados e deteriorados vêm das perdas reconhecidas. Faltas e sobras vêm de inventários/contagens. Sobra é crédito e reduz a perda consolidada.</p>${consolidatedKindChart(totals)}</article>
+  <article class="card table-section"><div class="section-title compact"><div><span class="section-kicker">DETALHAMENTO</span><h2>${esc(typeLabel)} por departamento</h2></div></div>${bars(typeRows.slice(0,10).map(r=>[r.name,Math.abs(Number(r.value||0)),(consolidatedKind==='sobras'?'− ':'')+money(Math.abs(Number(r.value||0)))]),consolidatedKind!=='sobras')}${table(['Departamento','Vendas','Valor','% sobre venda'],typeRows.map(r=>[esc(r.code+' · '+r.name),money(r.sales),(consolidatedKind==='sobras'?'− ':'')+money(Math.abs(Number(r.value||0))),pct(r.ratio)]))}</article>`;
+ }
  if(page===6)return tradePage();
  return '';
 }
@@ -456,6 +527,9 @@ function render(){
  if($('#emptyLogin'))$('#emptyLogin').onclick=()=>$('#login').showModal();if($('#emptyLocal'))$('#emptyLocal').onclick=()=>{page=7;render();$('#localFile').click()};
  document.querySelectorAll('[data-focus-dept]').forEach(el=>el.onclick=()=>{$('#dept').value=el.dataset.focusDept;page=0;render()});
  document.querySelectorAll('[data-loss-kind]').forEach(el=>el.onclick=()=>{lossKind=el.dataset.lossKind;page=1;render()});
+ document.querySelectorAll('[data-sales-day]').forEach(el=>el.onclick=()=>{$('#from').value=el.dataset.salesDay;$('#to').value=el.dataset.salesDay;render()});
+ document.querySelectorAll('[data-consolidated-kind]').forEach(el=>el.onclick=()=>{consolidatedKind=el.dataset.consolidatedKind;render()});
+ if($('#consolidatedKindFilter'))$('#consolidatedKindFilter').onchange=e=>{consolidatedKind=e.target.value;render()};
  if(page===1&&data)bindLossGrid();
  if(page===4&&data)bindAuditPage();
  if(page===2&&data){$('#productStatus').value=productStatus;renderProducts();loadSalesProducts();$('#productSearch').oninput=e=>{productQuery=e.target.value;productPage=0;renderProducts()};$('#productStatus').onchange=e=>{productStatus=e.target.value;productPage=0;renderProducts()};$('#salesCsv').onclick=()=>csv('vendas_produtos_'+activeStore+'.csv',['Loja','SKU','Produto','Departamento','Quantidade origem','Vendas'],products().map(x=>[activeStore,x.sku,x.produto,x.dept,String(x.qty).replace('.',','),x.value.toFixed(2).replace('.',',')]))}

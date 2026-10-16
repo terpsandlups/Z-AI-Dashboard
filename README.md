@@ -204,3 +204,13 @@ A página de Trocas trabalha com a posição vigente de estoque e organiza a ope
 - Fornecedor, tratativa, marca/linha, SKU/produto e busca textual filtram toda a página.
 - O CSV exportado respeita exatamente o recorte aplicado e inclui regra original, orientação operacional e destino físico/descarte.
 - Fornecedores sem regra não são classificados por semelhança de nome; aparecem como pendência de cadastro para evitar tratativa incorreta.
+
+
+## Fechamento das metas e análises por tipo — 16/10/2026
+
+- Metas oficiais de perdas e participação por departamento são persistidas no Supabase e também validadas no frontend da Loja 007.
+- O filtro principal exibe somente departamentos presentes na matriz oficial de metas.
+- Vendas & Participação inclui Meta de participação × realizado, meta diária derivada da meta da loja e gráfico dia a dia de Meta diária × Realizado.
+- Os gráficos de participação, metas de perdas, tipos de quebra e vendas diárias possuem ações de filtro/drill-down.
+- Perdas Consolidadas possui filtro e gráfico geral para Vencidos, Avariados, Deteriorados, Faltas de estoque, Sobras de estoque e Outros reconhecidos.
+- Perdas Reconhecidas permite filtrar por categoria de perda e por motivo original do ERP.

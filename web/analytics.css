@@ -18,3 +18,37 @@
 .audit-sortline label{display:flex;align-items:center;gap:8px}
 .analytics-secondary{margin-bottom:18px}
 @media(max-width:800px){.participation-line{grid-template-columns:1fr 1fr}.participation-values{grid-column:1}.participation-delta{grid-column:2}.loss-kind-chart{grid-template-columns:1fr 1fr}.loss-kind-chart strong{grid-column:1/-1}}
+
+
+/* Meta diária x realizado */
+.daily-chart-scroll{overflow-x:auto;padding:4px 0 2px}
+.daily-sales-chart{width:100%;min-width:760px;height:250px;display:block}
+.daily-sales-chart text{fill:#6a7d87;font-size:10px}
+.daily-grid{stroke:#e7edf1;stroke-width:1}
+.daily-goal-line{stroke:#5688a8;stroke-width:2;stroke-dasharray:7 6}
+.daily-goal-label{fill:#5688a8!important;font-weight:700}
+.daily-actual-line{fill:none;stroke:#2f8064;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.daily-point{cursor:pointer;stroke:#fff;stroke-width:2;transition:r .15s ease}
+.daily-point:hover{r:7}
+.daily-point.hit{fill:#3e956f}
+.daily-point.miss{fill:#bd655a}
+.daily-date{font-size:9px!important}
+.daily-actual-dot{background:#3e956f!important}
+.daily-goal-dot{background:#5688a8!important}
+
+/* Consolidado geral por tipo */
+.inline-filter{display:flex;align-items:center;gap:8px;font-size:11px;color:#607784}
+.inline-filter select{min-width:210px}
+.consolidated-kind-chart{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:14px}
+.consolidated-kind{display:grid;grid-template-columns:minmax(120px,1fr) 1.4fr auto;align-items:center;gap:12px;width:100%;padding:12px 13px;border:1px solid #e1e9ee;border-radius:10px;background:#fbfcfd;color:#28404e;text-align:left;cursor:pointer}
+.consolidated-kind:hover,.consolidated-kind.selected{border-color:#7198ac;background:#f1f7fa}
+.consolidated-kind.credit:hover,.consolidated-kind.credit.selected{border-color:#68a687;background:#f2faf6}
+.consolidated-kind span{display:grid;gap:2px}
+.consolidated-kind b{font-size:12px}
+.consolidated-kind small{font-size:10px;color:#71858f}
+.consolidated-kind i{height:8px;border-radius:999px;background:#e8eef1;overflow:hidden}
+.consolidated-kind i em{display:block;height:100%;border-radius:999px;background:#bb675d}
+.consolidated-kind.credit i em{background:#56a37e}
+.consolidated-kind strong{font-size:12px;white-space:nowrap}
+@media(max-width:980px){.consolidated-kind-chart{grid-template-columns:1fr 1fr}}
+@media(max-width:680px){.consolidated-kind-chart{grid-template-columns:1fr}.consolidated-kind{grid-template-columns:1fr}.inline-filter{width:100%;align-items:stretch;flex-direction:column}.inline-filter select{min-width:0;width:100%}}

@@ -642,7 +642,7 @@ async function parseSalesFile(file){
  const h1=(m[0]||[]).map(x=>String(x??'').trim()),h2=(m[1]||[]).map(hnorm);
  const horizontal=h1.slice(6).some(x=>/^\d{2}\/\d{2}\/\d{4}/.test(x))&&h2.slice(6).includes('vendas')&&h2.slice(6).includes('quantidade');
  if(horizontal){
-  const agg=new Map(),dates=[],source=0,descBySku=new Map();
+  const agg=new Map(),dates=[],descBySku=new Map();let source=0;
   const dateCols=[];
   for(let c=6;c<h1.length;c++){
    const mm=h1[c].match(/^(\d{2})\/(\d{2})\/(\d{4})/);

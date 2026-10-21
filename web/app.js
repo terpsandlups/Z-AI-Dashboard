@@ -586,7 +586,7 @@ function numeric(v){
 }
 function isoDate(v){
  const pad=n=>String(n).padStart(2,'0');
- if(v instanceof Date&&!isNaN(v))return v.getFullYear()+'-'+pad(v.getMonth()+1)+'-'+pad(v.getDate());
+ if(v instanceof Date&&!isNaN(v))return v.getUTCFullYear()+'-'+pad(v.getUTCMonth()+1)+'-'+pad(v.getUTCDate());
  if(typeof v==='number'&&window.XLSX?.SSF?.parse_date_code){const d=window.XLSX.SSF.parse_date_code(v);if(d)return d.y+'-'+pad(d.m)+'-'+pad(d.d)}
  const s=String(v??'').trim(),ymd=s.match(/^(\d{4})-(\d{2})-(\d{2})/),dmy=s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
  if(ymd)return ymd[1]+'-'+ymd[2]+'-'+ymd[3];if(dmy)return dmy[3]+'-'+dmy[2]+'-'+dmy[1];

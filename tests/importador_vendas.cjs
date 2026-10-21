@@ -5,6 +5,8 @@ const path=require('node:path');
 const source=fs.readFileSync(path.join(__dirname,'../web/app.js'),'utf8');
 const parser=source.slice(source.indexOf('async function parseSalesFile'),source.indexOf('function filenameDate'));
 const batcher=source.slice(source.indexOf('function salesBatches'),source.indexOf('async function chunkHash'));
+const dateParser=source.slice(source.indexOf('function isoDate(v)'),source.indexOf('function skuText(v)'));
+const isoDate=new Function('window',dateParser+'; return isoDate')({});
 const matrix=[
  ['Código','Descrição','Complemento','Cód. Dpto','Cód. Grupo','Marca','14/10/2026 Qua','14/10/2026 Qua','14/10/2026 Qua','15/10/2026 Qui','15/10/2026 Qui','15/10/2026 Qui'],
  ['','','','','','','Vendas','Quantidade','Ct Empresa','Vendas','Quantidade','Ct Empresa'],
@@ -19,6 +21,9 @@ const parse=new Function('matrixFrom','hnorm','skuText','deptCode','data',parser
 );
 const salesBatches=new Function(batcher+'; return salesBatches')();
 (async()=>{
+ process.env.TZ='America/Sao_Paulo';
+ assert.equal(isoDate(new Date('2026-10-20T00:00:00Z')),'2026-10-20','não antecipar um dia no fuso do Brasil');
+ assert.equal(isoDate('2026-10-20'),'2026-10-20');
  const parsed=await parse({});
  assert.equal(parsed.source,1,'source++ deve contar linhas de venda sem TypeError');
  assert.deepEqual(parsed.dates,['2026-10-14'],'dias inteiramente zerados não são importados');

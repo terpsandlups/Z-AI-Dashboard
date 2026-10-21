@@ -670,7 +670,9 @@ async function parseSalesFile(file){
    }
   }
   const rows=[...agg.values()];if(!rows.length)throw Error('Nenhuma venda encontrada no relatório horizontal.');
-  return {rows,dates:[...new Set(dates)].sort(),source};
+  const datesWithSales=[...new Set(rows.map(r=>r.data))].sort();
+  const emptyDates=[...new Set(dates)].filter(dt=>!datesWithSales.includes(dt)).sort();
+  return {rows,dates:datesWithSales,emptyDates,source};
  }
  const [hi,head]=findHeader(m,h=>{
   const hasSku=h.some(x=>['codigo','sku','codproduto','codigoproduto'].includes(x)),hasDate=h.some(x=>['data','datavenda','dtvenda','dtmvto','datamovimento'].includes(x)),hasQty=h.some(x=>['qtde','quantidade','qtdevendas','quantidadevendida'].includes(x)),hasValue=h.some(x=>['valor','valorvendas','valordevendas','vendaliquida','valorvenda'].includes(x));return hasSku&&hasDate&&hasQty&&hasValue;
@@ -735,7 +737,7 @@ function salesBatches(rows,limit=5000){
 }
 async function chunkHash(base,dates){const d=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(base+'|'+dates.join(',')));return [...new Uint8Array(d)].map(x=>x.toString(16).padStart(2,'0')).join('')}
 async function previewSales(file){pending=null;try{const p=await parseSalesFile(file),hash=await hashFile(file),set=new Set(p.dates),total=p.rows.reduce((s,r)=>s+r.valor,0),existing=(data.vendas_diarias_resumo||[]).filter(r=>set.has(r[0])),oldTotal=existing.reduce((s,r)=>s+Number(r[2]),0),oldDays=new Set(existing.map(r=>r[0])).size;
- const batches=salesBatches(p.rows);pending={type:'vendas',rows:p.rows,dates:p.dates,batches,hash,file:file.name,revision:data.revision};$('#importPreview').innerHTML=`<div class="notice"><b>Prévia de Vendas · ${esc(file.name)}</b><br>${num(p.source)} linhas de origem → ${num(p.rows.length)} combinações consolidadas<br>${p.dates.length} dias · ${esc(p.dates[0])} a ${esc(p.dates.at(-1))} · ${money(total)}<br>${oldDays?oldDays+' dias já possuem vendas e serão substituídos; valor atual '+money(oldTotal)+'.':'Nenhum dos dias do arquivo possui venda diária carregada.'}</div><label style="display:block"><input type="checkbox" id="confirmCheck"> Confirmo que o arquivo contém o relatório COMPLETO de vendas para todos os dias presentes. Os mesmos dias serão substituídos.</label><div class="actions"><button class="primary" id="commitImport">Confirmar gravação no Supabase</button></div>`;$('#commitImport').onclick=commitImport;
+ const batches=salesBatches(p.rows);pending={type:'vendas',rows:p.rows,dates:p.dates,batches,hash,file:file.name,revision:data.revision};$('#importPreview').innerHTML=`<div class="notice"><b>Prévia de Vendas · ${esc(file.name)}</b><br>${num(p.source)} linhas de origem → ${num(p.rows.length)} combinações consolidadas<br>${p.dates.length} dias · ${esc(p.dates[0])} a ${esc(p.dates.at(-1))} · ${money(total)}<br>${p.emptyDates?.length?'Dias sem movimentação ignorados (não serão substituídos): '+esc(p.emptyDates.join(', '))+'<br>':''}${oldDays?oldDays+' dias já possuem vendas e serão substituídos; valor atual '+money(oldTotal)+'.':'Nenhum dos dias do arquivo possui venda diária carregada.'}</div><label style="display:block"><input type="checkbox" id="confirmCheck"> Confirmo que o arquivo contém o relatório COMPLETO de vendas para todos os dias presentes. Os mesmos dias serão substituídos.</label><div class="actions"><button class="primary" id="commitImport">Confirmar gravação no Supabase</button></div>`;$('#commitImport').onclick=commitImport;
  }catch(e){msg(e.message,true);$('#importPreview').innerHTML=''}}
 async function previewAudit(file){pending=null;try{
  const p=await parseAuditFile(file),hash=await hashFile(file),sobras=p.rows.filter(r=>r.tipo==='entrada'),faltas=p.rows.filter(r=>r.tipo==='saida'),sobra=sobras.reduce((s,r)=>s+r.valor,0),falta=faltas.reduce((s,r)=>s+r.valor,0),resultado=falta-sobra;

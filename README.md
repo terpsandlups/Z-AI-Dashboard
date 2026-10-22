@@ -32,7 +32,7 @@ flowchart LR
     E -- "Sim" --> F["RPCs autenticadas no Supabase"]
     F --> G[("PostgreSQL: movimentos, cadastros, histórico")]
     G --> H["Consultas, resumos e regras de cálculo"]
-    H --> I["8 painéis interativos"]
+    H --> I["9 painéis interativos"]
     I --> J["Investigação e decisão operacional"]
 ```
 

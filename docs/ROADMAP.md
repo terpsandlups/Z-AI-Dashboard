@@ -23,7 +23,7 @@
 **Entregas presentes no repositório e banco piloto:**
 
 - [x] Layout executivo com navegação lateral.
-- [x] Nove áreas: Executivo, Perdas, Vendas, Comparador, Auditorias, Consolidadas, Trocas e Importações.
+- [x] Dez áreas: Executivo, Perdas, Vendas, Comparador, Auditorias, Consolidadas, Trocas, Importações, Produto 360° e Recorrência.
 - [x] JavaScript/HTML/CSS estático, hospedagem em Vercel.
 - [x] PostgreSQL/Supabase para autenticação, persistência, resumos e funções SQL.
 - [x] Controle de acesso a lojas autorizadas; papéis `consulta` e `importador`.
@@ -92,11 +92,11 @@
 
 ---
 
-## Fase 3 — Trocas 2.0 · Fluxo por fornecedor e tratativa
+## Fase 3 — Trocas 2.0 · Primeira entrega implementada
 
 **Base já existente:** Fornecedor 360°, filtros por marca, fornecedor, SKU e categoria; posição atual; CSV para vendedor; fornecedores sem regra cadastrada.
 
-**Evoluções possíveis:**
+**Primeira entrega implementada:** ficha por fornecedor e loja com status, responsável, prazo, próxima ação, observação e eventos auditáveis, independente dos snapshots do ERP. **Próximas evoluções:**
 
 - [ ] Separar mais claramente **Nota de Devolução** versus **Elas por Elas/Produto por Produto**, Bonificação e Mista.
 - [ ] Controle de pendências, tratativa, responsável, prazo e documentos por fornecedor.
@@ -115,7 +115,8 @@
 
 - [ ] Giro e cobertura de estoque por SKU.
 - [ ] Risco de vencimento e excesso de compra/produção, com regras por perecibilidade.
-- [ ] Recorrência de perda de baixo valor unitário e impacto acumulado.
+- [x] Primeira análise de recorrência por dias distintos, perda acumulada, média e maior lançamento.
+- [ ] Expandir para alertas automáticos, sazonalidade e comparação histórica.
 - [ ] Alertas de quebra acima da meta e anomalias simples explicáveis.
 - [ ] Painel de atenção por setor/produto com motivo do alerta.
 - [ ] Comparação pré/pós intervenção com critérios de amostra e período.

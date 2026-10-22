@@ -59,7 +59,7 @@ async function tradeTasksLoad(force=false){
   const result=await request('/rest/v1/rpc/zai_trocas_acompanhamentos',{p_loja:target});
   if(target!==activeStore)return;
   tradeTasks=Array.isArray(result)?result:[];tradeTaskLoaded=target;
- }catch(e){tradeTaskError=e.message||'Falha ao ler acompanhamentos';}
+ }catch(e){tradeTaskError=e.message||'Falha ao ler acompanhamentos';tradeTaskLoaded=target;}
  finally{tradeTaskBusy=false;if(page===6)render();}
 }
 async function tradeTaskOpen(code){

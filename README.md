@@ -5,7 +5,7 @@
 
 **Transformando relatórios do ERP em indicadores confiáveis, investigação por produto e decisões de loja.**
 
-[🌐 Abrir dashboard na Vercel](https://z-ai-dashboard-preview.vercel.app/) · [📐 Arquitetura](docs/ARQUITETURA.md) · [🔄 ETL e importações](docs/ETL_E_IMPORTACOES.md) · [📊 Dashboards](docs/DASHBOARDS_E_INDICADORES.md) · [🗺️ Roadmap](docs/ROADMAP.md)
+[🌐 Abrir dashboard na Vercel](https://z-ai-dashboard-preview.vercel.app/) · [📐 Arquitetura](docs/ARQUITETURA.md) · [🔄 ETL e importações](docs/ETL_E_IMPORTACOES.md) · [📊 Dashboards](docs/DASHBOARDS_E_INDICADORES.md) · [🗺️ Roadmap](docs/ROADMAP.md) · [🔎 Engenharia reversa](docs/REFERENCIAS_ENGENHARIA_REVERSA.md)
 
 **Piloto:** Loja **007 — Kalimera Japy** · Grupo MONTEKALI  
 **Stack:** HTML · CSS · JavaScript · Python · PostgreSQL/Supabase · SQL/PLpgSQL · Vercel · GitHub
@@ -32,7 +32,7 @@ flowchart LR
     E -- "Sim" --> F["RPCs autenticadas no Supabase"]
     F --> G[("PostgreSQL: movimentos, cadastros, histórico")]
     G --> H["Consultas, resumos e regras de cálculo"]
-    H --> I["9 painéis interativos"]
+    H --> I["10 painéis interativos"]
     I --> J["Investigação e decisão operacional"]
 ```
 
@@ -48,9 +48,10 @@ flowchart LR
 | **4. Comparador de Períodos** | Dois intervalos independentes, variação de indicadores e comparação por departamento |
 | **5. Perdas Desconhecidas · Inventário** | Auditorias de entradas/saídas, faltas/sobras, resultado líquido, filtros, detalhe e agrupamento por SKU |
 | **6. Perdas Consolidadas** | Integra quebra reconhecida, falta e sobra; filtros por tipo e comparações com a meta |
-| **7. Estoque de Trocas** | Fornecedor 360°, marca/linha, tratativa, saldo atual, posição por produto e CSV filtrado para vendedores |
+| **7. Estoque de Trocas** | Fornecedor 360°, marca/linha, saldo atual, CSV e **Trocas 2.0**: ficha de acompanhamento, status, responsável, prazo, próxima ação e histórico |
 | **8. Central de Importações** | Seleção do tipo, leitura dos formatos do ERP, prévia, confirmação, histórico de lotes e reversão controlada de cargas elegíveis |
 | **9. Produto 360°** | Pesquisa por SKU/descrição, venda, perda reconhecida, faltas, sobras, histórico e rastreabilidade por lote |
+| **10. Inteligência de Recorrência** | Analisa SKUs com perdas em dias distintos, valor acumulado, frequência e maior ocorrência |
 
 Os menus estão implementados no frontend. **Alguns recursos dependem de usuário autorizado, migrações SQL aplicadas e dados presentes para a loja selecionada.** Indicadores com cobertura incompleta indicam ausência de comparabilidade, em vez de fabricar percentuais.
 
@@ -157,6 +158,7 @@ node tests/calculos.cjs
 node tests/componentes.cjs
 node tests/importador_vendas.cjs
 node tests/produto360.cjs
+node tests/operations.cjs
 python -m unittest discover -s tests -p 'test_*.py'
 ```
 
@@ -171,6 +173,8 @@ Os testes usam bases fictícias e cobrem regras de cálculo, interação não gr
 | Auditorias, consolidado e gestão de fornecedores em Trocas | ✅ Implementado; refinamentos em evolução |
 | Histórico de cargas e reversão auditável de lotes elegíveis | ✅ Implementado; validar operacionalmente por perfil |
 | **Produto 360°**: vendas, quebras, faltas, sobras e rastreabilidade por SKU | ✅ MVP implementado, homologação visual pendente |
+| **Trocas 2.0**: fila de tratativas por fornecedor, responsáveis, prazos e auditoria | ✅ Primeira entrega implementada; testar com perfil de importação |
+| **Recorrência**: frequência em dias distintos, totais, filtros e drill-down | ✅ Primeira entrega implementada; homologação visual pendente |
 | Giro, cobertura de estoque e alertas priorizados | 🗺️ Planejado; depende de dados complementares |
 | Plano de ação, responsáveis, prazos e medição de resultados | 🗺️ Planejado |
 | Integração direta com ERP/API, sincronização e expansão multiloja plena | 🗺️ Futuro; depende de integração e homologação |

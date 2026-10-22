@@ -152,6 +152,7 @@ async function loadAuditData(force=false){
 }
 function renderAuditGridOnly(){
  if($('#auditGrid'))$('#auditGrid').innerHTML=auditGridHtml(auditData&&auditLoadedKey===auditRequestKey()?auditData:null);
+ if($('#auditGrid'))$('#auditGrid').querySelectorAll('[data-open-360]').forEach(b=>b.onclick=()=>p360SelectSku(b.dataset.open360));
  bindAuditPager();
 }
 function bindAuditPager(){

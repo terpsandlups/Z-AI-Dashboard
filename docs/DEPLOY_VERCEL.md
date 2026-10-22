@@ -32,6 +32,8 @@ A saída pública é composta pelos **arquivos de `web/` na raiz do deployment**
 ├── style.css
 ├── corporate.css
 ├── analytics.css
+├── product360.js
+├── product360.css
 └── config.js   # somente URL pública + chave publishable
 ```
 
@@ -86,8 +88,8 @@ Se uma publicação com arquivos diretos for utilizada, **não presumir** que o 
 |---|---|
 | `GET /` | **HTTP 200** e título **Z-AI-Gestão Visual** |
 | `GET /index.html` | **HTTP 200** |
-| `GET /app.js`, `/core.js`, `/ui.js` | **HTTP 200**, conteúdo JavaScript |
-| `GET /style.css`, `/corporate.css`, `/analytics.css` | **HTTP 200**, CSS |
+| `GET /app.js`, `/core.js`, `/ui.js`, `/product360.js` | **HTTP 200**, conteúdo JavaScript |
+| `GET /style.css`, `/corporate.css`, `/analytics.css`, `/product360.css` | **HTTP 200**, CSS |
 | `GET /config.js` | **HTTP 200**, config pública |
 | Login com usuário de teste autorizado | Consulta apenas loja permitida |
 | Dashboard executivo | Carrega vendas/perdas e cobertura da filial |

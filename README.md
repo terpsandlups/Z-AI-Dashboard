@@ -50,6 +50,7 @@ flowchart LR
 | **6. Perdas Consolidadas** | Integra quebra reconhecida, falta e sobra; filtros por tipo e comparações com a meta |
 | **7. Estoque de Trocas** | Fornecedor 360°, marca/linha, tratativa, saldo atual, posição por produto e CSV filtrado para vendedores |
 | **8. Central de Importações** | Seleção do tipo, leitura dos formatos do ERP, prévia, confirmação, histórico de lotes e reversão controlada de cargas elegíveis |
+| **9. Produto 360°** | Pesquisa por SKU/descrição, venda, perda reconhecida, faltas, sobras, histórico e rastreabilidade por lote |
 
 Os menus estão implementados no frontend. **Alguns recursos dependem de usuário autorizado, migrações SQL aplicadas e dados presentes para a loja selecionada.** Indicadores com cobertura incompleta indicam ausência de comparabilidade, em vez de fabricar percentuais.
 
@@ -110,7 +111,7 @@ O projeto atualmente **não exige React, Next.js, PHP, Power BI ou um servidor N
 
 ```text
 Z-AI-Dashboard/
-├── web/                   # Aplicação web: index.html, app.js, ui.js, core.js, CSS
+├── web/                   # Aplicação web: index.html, app.js, ui.js, core.js, product360.js, CSS
 ├── database/              # Estrutura, migrações e funções SQL/PLpgSQL
 ├── tools/                 # ETL histórico, conciliação, conversões, build Python
 ├── tests/                 # Testes de cálculo, interface e regressões
@@ -155,6 +156,7 @@ python -m http.server 8000 --bind 127.0.0.1 --directory web
 node tests/calculos.cjs
 node tests/componentes.cjs
 node tests/importador_vendas.cjs
+node tests/produto360.cjs
 python -m unittest discover -s tests -p 'test_*.py'
 ```
 
@@ -168,8 +170,8 @@ Os testes usam bases fictícias e cobrem regras de cálculo, interação não gr
 | Importação dos formatos operacionais e controle de cobertura | ✅ Implementado; melhorias contínuas |
 | Auditorias, consolidado e gestão de fornecedores em Trocas | ✅ Implementado; refinamentos em evolução |
 | Histórico de cargas e reversão auditável de lotes elegíveis | ✅ Implementado; validar operacionalmente por perfil |
-| **Produto 360°**: venda, quebra, faltas e sobras por SKU num só lugar | 🗺️ Próxima evolução |
-| Giro, cobertura de estoque, recorrência e alertas priorizados | 🗺️ Planejado; depende de dados complementares |
+| **Produto 360°**: vendas, quebras, faltas, sobras e rastreabilidade por SKU | ✅ MVP implementado, homologação visual pendente |
+| Giro, cobertura de estoque e alertas priorizados | 🗺️ Planejado; depende de dados complementares |
 | Plano de ação, responsáveis, prazos e medição de resultados | 🗺️ Planejado |
 | Integração direta com ERP/API, sincronização e expansão multiloja plena | 🗺️ Futuro; depende de integração e homologação |
 

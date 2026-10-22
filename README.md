@@ -1,216 +1,193 @@
-# Z-AI-Gestão Visual
+<div align="center">
 
-Dashboard Executivo de vendas, perdas e metas. Frontend estático em JavaScript,
-CSS e HTML; PostgreSQL/Supabase para autenticação, persistência e acesso por loja.
-## Piloto e expansão
+# Z-AI · Gestão Visual
+### Inteligência operacional para prevenção de perdas no varejo alimentar
 
-A **Loja 007 — Kalimera Japy** é a base piloto de testes. O objetivo é evoluir
-para todas as lojas, com autorização de acesso e configuração próprias por filial.
+**Transformando relatórios do ERP em indicadores confiáveis, investigação por produto e decisões de loja.**
 
-- **Meta diária de vendas:** definida por loja, no campo `baseline.meta_diaria`.
-- **Meta de perdas:** percentual sobre a venda, definido conforme o comportamento
-  e a operação da loja, no campo `baseline.meta_perda`. É uma fração decimal.
-- **Realizado:** perdas reconhecidas ÷ vendas no mesmo período e escopo.
-- **Limite em reais:** vendas × percentual de meta configurado da loja.
-- **Departamentos:** podem receber metas específicas. Sem meta setorial, a
-  comparação usa a referência da própria loja; sem configuração, mostra indisponível.
-- **Regras operacionais:** devem ser validadas conforme a operação de cada unidade.
-  O sistema não deduz automaticamente a meta ideal a partir do histórico.
+[🌐 Abrir dashboard na Vercel](https://z-ai-dashboard-preview.vercel.app/) · [📐 Arquitetura](docs/ARQUITETURA.md) · [🔄 ETL e importações](docs/ETL_E_IMPORTACOES.md) · [📊 Dashboards](docs/DASHBOARDS_E_INDICADORES.md) · [🗺️ Roadmap](docs/ROADMAP.md)
 
-As configurações são mantidas por loja em `montekali.configuracao_painel` e
-retornadas pelo snapshot autorizado. Nesta fase, a edição é administrativa;
-não há formulário de configuração de metas no frontend. O calendário atual usa
-os dias corridos do período coberto; calendários operacionais particulares são evolução futura.
-Os importadores históricos legados continuam específicos do piloto e precisam de
-adaptação validada antes de uso em outras lojas. A interface e as consultas já
-respeitam a filial selecionada e suas permissões.
+**Piloto:** Loja **007 — Kalimera Japy** · Grupo MONTEKALI  
+**Stack:** HTML · CSS · JavaScript · Python · PostgreSQL/Supabase · SQL/PLpgSQL · Vercel · GitHub
 
-## Estado da entrega
+</div>
 
-Este repositório contém o código do painel e não contém backups,
-planilhas, movimentos comerciais nem senha administrativa. Ele não restaura dados
-automaticamente nem comprova que as migrações já foram executadas no ambiente de produção.
+---
 
-Menus: Visão Executiva, Perdas Reconhecidas, Vendas & Participação, Comparador de Períodos, Perdas Desconhecidas/Inventário, Perdas Consolidadas, Estoque de Trocas e Central de Importações. A Central aceita os formatos reais do ERP. Auditorias de estoque usam uma única carga conjunta para Entradas (sobras) + Saídas (faltas), sempre em modo complementar e com bloqueio de duplicidade.
+## O projeto em uma frase
 
-Perdas Reconhecidas mostra todos os lançamentos da competência, mesmo depois do
-último dia com vendas completas. Nessa situação o percentual fica indisponível.
-Resumo e Comparativos usam o corte comum informado na tela. Inativos mantêm seu
-histórico. O diário substitui o mensal no cálculo quando tem cobertura completa;
-as duas fontes nunca são somadas. Médias semanais incluem dias cobertos sem venda.
+O **Z-AI** é um dashboard executivo de prevenção de perdas que organiza **vendas, quebras reconhecidas, divergências de inventário, trocas, metas e indicadores** em um único ambiente. Em vez de preparar várias planilhas manualmente e construir gráficos isolados, o operador **seleciona a loja, escolhe o tipo de relatório e importa um arquivo do ERP**. O sistema interpreta a estrutura, valida dados, oferece uma prévia e, após confirmação, grava o resultado no banco. Os dashboards consultam a base consolidada.
+
+> **Proposta central:** uma operação simples para o usuário; tratamento, integridade e regras analíticas explícitas nos bastidores. O Z-AI **não depende de acesso direto ao ERP** na fase atual. Os arquivos operacionais continuam sendo a origem das atualizações.
+
+### Como funciona, de ponta a ponta
+
+```mermaid
+flowchart LR
+    A["ERP / Relatórios operacionais"] --> B["Excel, CSV ou JSON"]
+    B --> C["Central de Importações"]
+    C --> D["ETL: leitura, normalização e validação"]
+    D --> E{"Prévia aprovada?"}
+    E -- "Não" --> B
+    E -- "Sim" --> F["RPCs autenticadas no Supabase"]
+    F --> G[("PostgreSQL: movimentos, cadastros, histórico")]
+    G --> H["Consultas, resumos e regras de cálculo"]
+    H --> I["8 painéis interativos"]
+    I --> J["Investigação e decisão operacional"]
+```
+
+**Dois exemplos reais de fluxo:** um Excel de **vendas com vários dias** é transformado automaticamente em movimentos diários; uma planilha de **auditorias** é classificada em **Entradas = Sobras** e **Saídas = Faltas**. A aplicação não confunde lançamento reconhecido com divergência de estoque.
+
+## O que já está implementado
+
+| Módulo | O que entrega |
+|---|---|
+| **1. Visão Executiva** | Vendas, perdas reconhecidas, faltas, sobras, perda consolidada, percentual sobre vendas e visão departamental |
+| **2. Perdas Reconhecidas** | Lançamentos por SKU, departamento, período, motivo e categoria; análise **individual ou acumulada** e recorrências |
+| **3. Vendas & Participação** | Faturamento, produtos, participação dos setores, metas diárias, realizado por dia e comparativos |
+| **4. Comparador de Períodos** | Dois intervalos independentes, variação de indicadores e comparação por departamento |
+| **5. Perdas Desconhecidas · Inventário** | Auditorias de entradas/saídas, faltas/sobras, resultado líquido, filtros, detalhe e agrupamento por SKU |
+| **6. Perdas Consolidadas** | Integra quebra reconhecida, falta e sobra; filtros por tipo e comparações com a meta |
+| **7. Estoque de Trocas** | Fornecedor 360°, marca/linha, tratativa, saldo atual, posição por produto e CSV filtrado para vendedores |
+| **8. Central de Importações** | Seleção do tipo, leitura dos formatos do ERP, prévia, confirmação, histórico de lotes e reversão controlada de cargas elegíveis |
+
+Os menus estão implementados no frontend. **Alguns recursos dependem de usuário autorizado, migrações SQL aplicadas e dados presentes para a loja selecionada.** Indicadores com cobertura incompleta indicam ausência de comparabilidade, em vez de fabricar percentuais.
+
+Veja as regras e as decisões atendidas em **[Dashboards e Indicadores](docs/DASHBOARDS_E_INDICADORES.md)**.
+
+## ETL: a importação faz o trabalho pesado
+
+A **Central de Importações** aplica um fluxo de **Extract → Transform → Load**:
+
+1. **Extract:** lê Excel/CSV/JSON do ERP no navegador; identifica abas, cabeçalhos e tipo de relatório.
+2. **Transform:** padroniza datas, SKUs, códigos de departamento, quantidades, valores e motivos; valida o cadastro; consolida combinações quando apropriado.
+3. **Validate:** calcula quantidade de registros, valor total, datas alcançadas e efeitos da atualização; mostra uma **prévia**. Nada é gravado antes da confirmação.
+4. **Load:** utiliza funções SQL autenticadas (RPC) para inserir ou substituir os dados de acordo com a regra do tipo, registrar lote, conferir revisão e atualizar indicadores.
+5. **Analyze:** os dashboards exibem KPIs, séries, rankings, comparadores e filtros a partir de dados consolidados.
+
+| Origem | Entrada principal | Regra de atualização |
+|---|---|---|
+| **Vendas** | Excel horizontal do ERP (`Vendas` / `Quantidade` / `Ct Empresa`) ou CSV normalizado | **Substitui dias completos** informados no arquivo; faz lotes por dia automaticamente e ignora dias inteiramente zerados |
+| **Perdas reconhecidas** | Excel operacional ou backup JSON validado | **Complementa** ocorrências ou **substitui dias completos** conforme modo escolhido |
+| **Auditorias** | Excel com entradas + saídas | **Complementar**, preserva movimentos anteriores e bloqueia duplicidades |
+| **Trocas** | Excel com posição de estoque para troca | **Substitui a posição vigente**; snapshots e histórico não devem ser somados ao saldo atual |
+
+**Segurança contra erros:** as cargas registram origem, valor, contagem e revisão da base. O módulo de **Desfazer importação** permite reverter **lotes elegíveis**, exige usuário importador, justificativa e confirmação textual; preserva a trilha do lote. Lotes substitutivos sem restauração segura ficam protegidos para revisão manual. Uma atualização de vendas pode restaurar movimentos anteriores guardados no histórico quando a operação permite reversão segura.
+
+**Importante:** arquivos do ERP não são enviados automaticamente. A operação é *assistida por importação*; atualização em tempo real, API de ERP e agendamentos ficam para fases futuras.
+
+➡️ **[Entenda o ETL com detalhes técnicos, layouts, exemplos e regras de integridade](docs/ETL_E_IMPORTACOES.md)**
+
+## Indicadores: regras antes dos gráficos
+
+- **Falta** = movimentação de **saída** na auditoria de estoque.
+- **Sobra** = movimentação de **entrada** na auditoria de estoque.
+- **Resultado líquido de inventário** = **Faltas − Sobras**.
+- **Perdas consolidadas** = **Perdas reconhecidas + Faltas − Sobras**.
+- **% de perdas consolidadas** = **Perdas consolidadas / Vendas comparáveis**.
+- **Meta por loja / departamento** = comparação do realizado com a referência configurada. O piloto usa uma referência geral de perdas de **2,40%** e meta diária de vendas de **R$ 180 mil**; outros setores podem ter metas próprias.
+- **Cobertura temporal:** o sistema evita somar mensal e diário duas vezes e sinaliza quando perdas e vendas não cobrem o mesmo período.
+- **Ranking de auditorias:** faltas da maior para a menor; depois sobras da maior para a menor, com ordenação aplicada antes da paginação na consulta SQL.
+
+**O foco não é preencher telas com gráficos.** Cada visualização deve ajudar a detectar concentração, recorrência, diferenças por departamento, desvios de meta ou produtos que precisam de ação.
+
+## Arquitetura e responsabilidades das tecnologias
+
+| Tecnologia | Responsabilidade |
+|---|---|
+| **HTML5** | Estrutura semântica, navegação, formulários e elementos da interface |
+| **CSS3** | Layout responsivo, menu lateral, cartões, tabelas e visual corporativo |
+| **JavaScript (vanilla)** | Componentes e filtros interativos, leitura e prévia dos arquivos, ETL client-side, autenticação e chamadas RPC |
+| **Biblioteca SheetJS/XLSX (via CDN)** | Leitura de arquivos Excel no navegador |
+| **PostgreSQL + SQL/PLpgSQL** | Tabelas, integridade, consolidação, lógica transacional, histórico e funções analíticas |
+| **Supabase** | Hospeda PostgreSQL, Authentication, controle de acesso por loja e API de funções |
+| **Python** | Ferramentas administrativas locais, conversão/conciliação, validação de bases e geração do frontend público |
+| **Node.js** | Execução dos testes de cálculo e componentes JavaScript (não é o servidor do dashboard) |
+| **GitHub** | Versionamento de frontend, scripts, migrações, testes e documentação |
+| **Vercel** | Publicação do **frontend estático**; o banco **não** fica hospedado na Vercel |
+
+O projeto atualmente **não exige React, Next.js, PHP, Power BI ou um servidor Node para executar o frontend**. As análises são implementadas em JS e SQL. Não confundir o nome *dashboard estilo Power BI* com uso da tecnologia Power BI.
+
+```text
+Z-AI-Dashboard/
+├── web/                   # Aplicação web: index.html, app.js, ui.js, core.js, CSS
+├── database/              # Estrutura, migrações e funções SQL/PLpgSQL
+├── tools/                 # ETL histórico, conciliação, conversões, build Python
+├── tests/                 # Testes de cálculo, interface e regressões
+├── docs/                  # Arquitetura, ETL, indicadores, Vercel e roadmap
+├── netlify.toml           # Configuração histórica/alternativa de hospedagem
+├── requirements.txt       # Dependências de scripts Python administrativos
+├── INICIAR_PAINEL.bat     # Servidor HTTP local no Windows
+└── README.md              # Visão geral do projeto
+```
+
+A pasta `data/`, arquivos de operação, `web/config.js`, credenciais e o diretório gerado `dist/` são ignorados pelo Git. **Bases de vendas, perdas e backups privados não fazem parte do repositório público.**
+
+➡️ [Arquitetura detalhada e mapa do código](docs/ARQUITETURA.md)
+
+## Publicação na Vercel
+
+**Ambiente público de testes:** https://z-ai-dashboard-preview.vercel.app/
+
+A Vercel serve os arquivos estáticos de interface; o JavaScript consulta as RPCs do Supabase somente depois do login e da autorização para a loja. Há suporte a build pelo script Python `tools/build_frontend.py`, que gera `dist/` a partir de `web/` e cria a configuração pública usando apenas `SUPABASE_URL` e `SUPABASE_PUBLISHABLE_KEY`.
+
+**Situação da entrega:** a implantação Vercel do piloto está ativa. Houve publicações manuais por API; **não presumir que cada commit no GitHub gera automaticamente um deploy** sem validar a integração Git/CI. As implantações devem conferir pasta de saída e resposta HTTP de `/` e `/index.html`: **READY não prova que o site não retorna 404**.
+
+➡️ [Publicação, configuração, segurança e diagnóstico de 404](docs/DEPLOY_VERCEL.md)
 
 ## Rodar localmente
 
 1. Copie `web/config.example.js` para `web/config.js`.
-2. Preencha somente a URL do projeto Supabase e a chave **publishable**.
-3. Execute `INICIAR_PAINEL.bat`, ou:
+2. Preencha **somente** a URL pública do Supabase e sua chave **publishable**.
+3. No Windows, execute `INICIAR_PAINEL.bat` ou inicie um servidor estático:
 
-```sh
+```bash
 python -m http.server 8000 --bind 127.0.0.1 --directory web
 ```
 
-Abra http://localhost:8000. Entre com a conta de Authentication autorizada para
-a filial. A opção de conferência local abre uma **base analítica Z-AI v2**.
-Backups legados precisam ser conciliados antes; podem conter somente perdas.
+4. Abra `http://localhost:8000` e autentique-se com usuário liberado na filial.
 
-## Banco existente
+**Scripts administrativos de Python** podem necessitar de `python -m pip install -r requirements.txt` e conexão administrativa **somente em ambiente protegido**. Não use `service_role`, senhas nem cadeia de conexão privada no browser.
 
-Preserve o banco em uso. Se a versão anterior ainda não estiver ativada, execute
-`database/03_painel_v2.sql`. Depois execute `database/08_vendas_diarias_multiloja.sql` e `database/10_auditorias_trocas.sql`.
-Crie a conta em Authentication e ajuste o UUID em `database/04_autorizar_usuario.sql`.
-As funções validam usuário, filial e papel; não há acesso anônimo aos movimentos.
-Não reexecute a criação inicial 01 nem a carga inicial 02 em um banco já preenchido.
+### Testes locais
 
-Para um ambiente novo, execute 01, valide e importe o backup com 02 (primeiro
-simulação, depois `--commit`); então execute 03, 08 e a autorização 04.
-O script 02 recusa importar sobre perdas existentes.
-
-```sh
-python -m pip install -r requirements.txt
-python tools/02_importar_backup.py --backup CAMINHO_PRIVADO.json --validar-arquivo
-```
-
-Para conectar os scripts administrativos, configure a variável de conexão indicada nos scripts somente
-no ambiente local. Não envie essa conexão para o frontend, GitHub ou chat.
-O arquivo `.env.example` documenta nomes; os scripts não carregam `.env` automaticamente.
-
-## Dados e atualizações
-
-Crie `data/` localmente e use os arquivos privados já conferidos:
-`base_conferida.json`, `vendas_diarias.csv.gz` e `auditoria_vendas.json`.
-Essa pasta é ignorada pelo Git e nunca é publicada.
-
-- Histórico diário de vendas: `python tools/09_carregar_diario_historico.py`. Após conferir a simulação, repita com `--commit`. Recusa sobreposição com vendas existentes.
-- Atualizações de rotina: use **Importar e Exportar → Central de importações**. Perdas aceitam Excel/JSON; Vendas aceitam Excel/CSV diário e substituem somente os dias presentes no arquivo, sempre após prévia e confirmação.
-- Perdas Excel também podem ser convertidas por `tools/06_converter_perdas.py arquivo.xlsx`; no layout piloto, `Ct Médio` é tratado como total da linha.
-- Auditorias de estoque aparecem em uma única opção: Entradas + Saídas. A importação adiciona novos movimentos e nunca apaga dias anteriores. Trocas é posição atual e substitui o snapshot vigente, evitando somar posições sucessivas.
-- No painel, selecione Perdas ou Vendas antes do JSON. Substituição por dia exige
-  relatório completo e conserva auditoria. A exportação analítica não substitui
-  um backup completo do PostgreSQL.
-
-Conciliação **local** de um novo backup legado com a base analítica:
-
-```sh
-python tools/10_atualizar_base_local.py --base data/base_conferida.json --backup data/backup.json --saida data/base_atualizada.json
-```
-
-O script preserva vendas, metas, situação dos produtos e ocorrências legítimas
-idênticas. Recusa perda de lançamentos anteriores. Não grava no Supabase e não
-sobrescreve nenhum arquivo. Sem `--saida`, apenas valida.
-
-## Publicação do frontend
-
-O `netlify.toml` gera e publica somente `dist/`. Configure as variáveis públicas
-`SUPABASE_URL` e `SUPABASE_PUBLISHABLE_KEY` na hospedagem. O build aceita apenas
-chave publishable; não utiliza senha do banco nem service role.
-
-```sh
-python tools/build_frontend.py
-```
-
-GitHub guarda as versões do código; Supabase guarda os dados. Alterar o código
-não deve reimportar ou apagar movimentos. O acesso ao banco em produção depende
-da ativação das migrações e da autorização do usuário.
-
-## Verificação
-
-```sh
+```bash
 node tests/calculos.cjs
 node tests/componentes.cjs
+node tests/importador_vendas.cjs
 python -m unittest discover -s tests -p 'test_*.py'
 ```
 
-Os testes usam dados fictícios e verificam cobertura, comparabilidade, preservação
-de perdas, duplicidades legítimas, filtros e componentes. Não são uma revisão
-visual em navegador nem um teste integrado com o Supabase. A validação de login,
-permissões e gravação deve ocorrer no ambiente de homologação antes da ativação.
+Os testes usam bases fictícias e cobrem regras de cálculo, interação não gráfica e regressões do importador. **Não substituem** a validação visual, as permissões e o teste de escrita numa loja de homologação.
 
-Repositório público: **terpsandlups/Z-AI-Dashboard**. Os dados operacionais ficam no Supabase e nos arquivos privados autorizados.
+## Fases de evolução
 
+| Fase | Situação |
+|---|---|
+| Base de dados, autenticação, metas, dashboard e módulos de perdas/vendas | ✅ Implementado |
+| Importação dos formatos operacionais e controle de cobertura | ✅ Implementado; melhorias contínuas |
+| Auditorias, consolidado e gestão de fornecedores em Trocas | ✅ Implementado; refinamentos em evolução |
+| Histórico de cargas e reversão auditável de lotes elegíveis | ✅ Implementado; validar operacionalmente por perfil |
+| **Produto 360°**: venda, quebra, faltas e sobras por SKU num só lugar | 🗺️ Próxima evolução |
+| Giro, cobertura de estoque, recorrência e alertas priorizados | 🗺️ Planejado; depende de dados complementares |
+| Plano de ação, responsáveis, prazos e medição de resultados | 🗺️ Planejado |
+| Integração direta com ERP/API, sincronização e expansão multiloja plena | 🗺️ Futuro; depende de integração e homologação |
 
-## Auditorias e Trocas
+➡️ **[Roadmap detalhado por fases e critérios de aceite](docs/ROADMAP.md)**
 
-A migração `database/10_auditorias_trocas.sql` cria:
+## Governança do projeto
 
-- `montekali.auditorias_estoque`: estrutura comum para Auditoria de Entrada e Auditoria de Saída.
-- `montekali.trocas_posicao`: posição atual de trocas, sem somar snapshots antigos.
-- `montekali.trocas_snapshots`: histórico de cada posição importada.
-- Resumos autorizados no `zai_snapshot` para exibição dos KPIs.
+A **Loja 007** é o piloto operacional, não uma amostra representativa de todas as lojas. Metas, permissões, fornecedores e regras comerciais são parametrizados por filial; a expansão exige homologar layouts do ERP, políticas de acesso e indicadores em cada unidade.
 
-Nenhuma regra de falta/sobra é inferida automaticamente. O cálculo de Perdas Consolidadas só será ativado depois que o significado operacional das colunas de entrada e saída for confirmado com arquivos reais do ERP.
+**Dados não são descartáveis.** Ao corrigir uma importação, o sistema deve preservar o histórico, confirmar os efeitos, recalcular resumos e permitir rastrear quem e por que fez a alteração. Nunca use scripts de carga inicial sobre o banco já populado sem entender as pré-condições das migrações.
 
+---
 
-## Formatos operacionais oficiais do ERP
+<div align="center">
 
-A partir de outubro/2026, a Central de Importações aceita diretamente os formatos usados pela Loja 007:
+**Z-AI · Gestão Visual**  
+*Menos planilhas operacionais. Mais consistência, rastreabilidade e decisões orientadas por dados.*
 
-- **Vendas:** relatório horizontal por produto, com blocos diários `Vendas | Quantidade | Ct Empresa`. Para analytics são usados Vendas e Quantidade; Ct Empresa não entra no faturamento.
-- **Perdas reconhecidas:** Excel operacional ou backup JSON `kalimera-pp-007-v1`. O backup completo deve usar substituição dos dias presentes.
-- **Auditorias de estoque:** um único Excel pode conter Entradas e Saídas. **Entrada = SOBRA** e **Saída = FALTA**. A carga é **incremental/complementar**: adiciona novos movimentos, não substitui dias já existentes e bloqueia arquivo/lançamentos repetidos.
-- **Resultado líquido de inventário:** `Faltas - Sobras`.
-- **Perda consolidada:** `Quebras reconhecidas + Faltas - Sobras`.
-- **Trocas:** posição de estoque; cada arquivo substitui integralmente a posição anterior. O snapshot anterior é mantido somente para auditoria/histórico.
+[Experimentar a interface](https://z-ai-dashboard-preview.vercel.app/) · [Consultar a documentação](docs/ARQUITETURA.md)
 
-A data de referência de Trocas é lida do nome do arquivo no padrão `trocas DD-MM.xlsx`.
-
-
-## Estrutura de menus executivos
-
-A navegação principal do Z-AI segue a leitura operacional da prevenção de perdas:
-
-1. **Visão Executiva** — Vendas, Perdas Reconhecidas, Perdas Desconhecidas (faltas), Sobras, Perdas Consolidadas e % Consolidada/Vendas, com resumo por departamento.
-2. **Perdas Reconhecidas** — quebras operacionais registradas e análise por produto, motivo e departamento.
-3. **Vendas & Participação** — faturamento, participação dos departamentos e produtos.
-4. **Comparador de Períodos** — compara dois intervalos independentes, inclusive por departamento, usando a mesma fórmula consolidada.
-5. **Perdas Desconhecidas · Inventário** — faltas, sobras e resultado líquido de inventários/contagens.
-6. **Perdas Consolidadas** — Perdas Reconhecidas + Faltas − Sobras, com percentual sobre a venda comparável.
-7. **Estoque de Trocas** — posição atual, sem somar snapshots.
-8. **Central de Importações** — cargas de Vendas, Perdas, Auditorias e Trocas.
-
-Para percentuais sobre vendas, o painel usa somente a cobertura comparável entre vendas e perdas; lançamentos posteriores continuam visíveis nas páginas operacionais, mas não distorcem o indicador executivo.
-
-
-## Dashboard operacional vNext
-
-A navegação executiva usa filtro por **data inicial e final**. Para períodos com base diária, os indicadores são calculados no intervalo exato; o histórico que existe somente em competência mensal continua disponível quando o mês inteiro é selecionado.
-
-### Meta de perdas
-
-- Meta geral Loja 007: **2,40%**.
-- Realizado executivo: `Perdas Consolidadas / Vendas comparáveis`.
-- Perdas Consolidadas: `Perdas Reconhecidas + Faltas - Sobras`.
-- O painel mostra Meta, Realizado, Desvio em p.p. e Limite financeiro da meta.
-
-### Estoque de Trocas
-
-A posição de Trocas é classificada pela regra operacional do fornecedor em:
-- NF / Nota de Devolução;
-- Elas por elas;
-- Bonificação;
-- Produto por produto;
-- Mista;
-- Sem regra cadastrada.
-
-A tabela `montekali.trocas_regras_fornecedor` guarda a tratativa, forma de resolução, marca/produto e regra de guarda/descarte do físico. Fornecedores não presentes na tabela operacional permanecem explicitamente como **Sem regra cadastrada**, sem classificação inferida.
-
-
-## Trocas · Fornecedor 360
-
-A página de Trocas trabalha com a posição vigente de estoque e organiza a operação por fornecedor.
-
-- **NF / Nota de devolução**: tratativas fiscais, preservando as condições específicas cadastradas.
-- **Troca produto por produto**: categoria analítica única para os termos operacionais “Elas por elas” e “Produto por produto”. O texto original continua salvo para consulta.
-- **Bonificação** e **Mista** permanecem separadas.
-- Fornecedor, tratativa, marca/linha, SKU/produto e busca textual filtram toda a página.
-- O CSV exportado respeita exatamente o recorte aplicado e inclui regra original, orientação operacional e destino físico/descarte.
-- Fornecedores sem regra não são classificados por semelhança de nome; aparecem como pendência de cadastro para evitar tratativa incorreta.
-
-
-## Fechamento das metas e análises por tipo — 16/10/2026
-
-- Metas oficiais de perdas e participação por departamento são persistidas no Supabase e também validadas no frontend da Loja 007.
-- O filtro principal exibe somente departamentos presentes na matriz oficial de metas.
-- Vendas & Participação inclui Meta de participação × realizado, meta diária derivada da meta da loja e gráfico dia a dia de Meta diária × Realizado.
-- Os gráficos de participação, metas de perdas, tipos de quebra e vendas diárias possuem ações de filtro/drill-down.
-- Perdas Consolidadas possui filtro e gráfico geral para Vencidos, Avariados, Deteriorados, Faltas de estoque, Sobras de estoque e Outros reconhecidos.
-- Perdas Reconhecidas permite filtrar por categoria de perda e por motivo original do ERP.
+</div>

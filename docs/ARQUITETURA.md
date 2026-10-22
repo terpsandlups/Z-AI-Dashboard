@@ -35,7 +35,6 @@ flowchart TB
  DB --> RPC
  RPC -->|"Snapshot, resumos, análises"| F
  UI --> F
- end
  subgraph Eng["Desenvolvimento e entrega"]
  G["GitHub"]
  PY["Python: build e operações administrativas"]

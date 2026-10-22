@@ -529,9 +529,59 @@ function future(){
  if(page===6)return tradePage();
  return '';
 }
+let importHistoryRows=[],importHistoryKey='',importHistoryLoading=false;
+function showImportHistory(){
+ const root=$('#importHistoryGrid');
+ if(!root)return;
+ if(!cloud){root.innerHTML=table(['Arquivo','Quando','Registros','Valor','Tipo'],(data?.historico||[]).map(r=>[esc(r.file||''),esc(r.when?new Date(r.when).toLocaleString('pt-BR'):''),num(r.rows||0),money(r.value||0),esc(r.tipo||'Backup histórico')]));return;}
+ if(importHistoryLoading&&importHistoryRows.length===0){root.innerHTML='<div class="loading-state">Consultando histórico seguro…</div>';return;}
+ root.innerHTML=table(['Lote / Arquivo','Quando','Registros','Valor','Tipo','Status / Ação'],
+ importHistoryRows.map(r=>{
+  const done=r.desfeito;
+  let status=done?'<span class="status-chip neutral">Desfeito</span>':!r.pode_desfazer?'<span class="small muted">Protegido · revisão manual</span>':
+    '<button type="button" data-undo-lote="'+Number(r.id)+'">Desfazer</button>';
+  if(done&&r.cancelamento?.motivo)status+='<p class="small muted">'+esc(r.cancelamento.motivo)+'</p>';
+  return [esc(String(r.id)+' · '+(r.file||'')),esc(r.when?new Date(r.when).toLocaleString('pt-BR'):''),num(r.rows||0),money(Number(r.value||0)),esc(r.tipo||''),status];
+ }));
+ root.querySelectorAll('[data-undo-lote]').forEach(btn=>btn.onclick=()=>undoImportLot(Number(btn.dataset.undoLote)));
+}
+async function loadImportHistory(force=false){
+ if(!cloud||!data||page!==7)return;
+ const key=activeStore+'|'+data.revision;
+ if(!force&&importHistoryKey===key)return showImportHistory();
+ if(importHistoryLoading)return;
+ importHistoryLoading=true;importHistoryRows=[];showImportHistory();
+ try{
+  const rows=await request('/rest/v1/rpc/zai_historico_importacoes',{p_loja:activeStore});
+  if(page!==7||!data||key!==activeStore+'|'+data.revision)return;
+  importHistoryRows=Array.isArray(rows)?rows:[];
+  importHistoryKey=key;
+ }catch(e){msg('Histórico de importações: '+e.message,true);}
+ finally{importHistoryLoading=false;if(page===7)showImportHistory();}
+}
+async function undoImportLot(id){
+ if(!cloud||!data||data.papel!=='importador')return;
+ const lot=importHistoryRows.find(x=>Number(x.id)===id);
+ if(!lot||!lot.pode_desfazer||lot.desfeito)return;
+ const reason=window.prompt('Justifique a reversão do lote '+id+' ('+(lot.file||'')+'). Esta ação altera os indicadores e será registrada:');
+ if(reason===null)return;
+ if(reason.trim().length<10){msg('Informe um motivo de pelo menos 10 caracteres.',true);return;}
+ const typed=window.prompt('Para confirmar a exclusão dos '+num(lot.rows||0)+' lançamentos do lote '+id+' (e a restauração dos anteriores, quando houver), digite DESFAZER:');
+ if(typed!=='DESFAZER'){msg('Operação cancelada. É necessário digitar DESFAZER.',true);return;}
+ const btn=$('[data-undo-lote="'+id+'"]');
+ if(btn)btn.disabled=true;
+ try{
+  const result=await request('/rest/v1/rpc/zai_desfazer_importacao',{
+   p_loja:activeStore,p_lote:id,p_revision:data.revision,p_confirmacao:'DESFAZER',p_motivo:reason.trim()
+  });
+  importHistoryKey='';importHistoryRows=[];
+  await refresh();
+  msg('Lote '+id+' desfeito: '+num(result.excluidos)+' lançamentos retirados; '+num(result.restaurados)+' vendas anteriores recuperadas. Histórico preservado.');
+ }catch(e){msg('Reversão não realizada: '+e.message,true);if(btn)btn.disabled=false;}
+}
 function exchange(){return `<div class="grid2"><article class="card"><h2>Central de importações</h2><p class="desc">Atualize cada operação pelo seu próprio tipo de relatório. A Loja selecionada é aplicada à carga e toda gravação exige prévia e confirmação.</p><label>Tipo de relatório <span aria-hidden="true">*</span><select id="reportType" required><option value="">Selecione antes de escolher o arquivo</option><option value="perdas">Perdas</option><option value="vendas">Vendas</option><option value="auditorias_estoque">Auditorias de estoque · Entradas + Saídas</option><option value="trocas">Trocas · saldo atual</option></select></label><div id="typeGuide" class="notice info">Selecione o tipo de relatório para ver a regra de atualização.</div><div id="modeWrap"><label>Tipo de atualização<select id="importMode"><option value="complementar">Complementar · preserva registros existentes</option><option value="substituir_dias">Relatório completo · substituir dias presentes</option></select></label></div><div class="upload"><label>Selecionar arquivo do ERP<input id="lossFile" type="file" accept=".xlsx,.xls,.csv,.json" disabled></label><p class="small muted">Perdas: Excel/JSON Kalimera. Vendas: Excel horizontal do ERP ou formato normalizado. Auditorias: um único Excel com Entradas (sobras) + Saídas (faltas). Trocas: Excel de posição atual.</p></div>${!cloud?'<p class="notice">Conecte o Supabase para gravar. A conferência local não atualiza a nuvem.</p>':data?.papel!=='importador'?'<p class="notice">Esta conta possui acesso somente leitura.</p>':''}<div id="importPreview"></div><p class="small muted">Vendas substituem somente os dias presentes. Auditorias são sempre complementares: novos movimentos são adicionados sem apagar dias anteriores, com bloqueio de duplicidade. Trocas sempre substitui a posição inteira. O histórico de importações permanece auditável.</p></article>
  <article class="card"><h2>Exportar e conferir</h2><p class="desc">A exportação analítica inclui perdas, resumos de vendas, cadastro e metas. O detalhe diário completo permanece no Supabase.</p><div class="actions"><button id="backup" ${!data?'disabled':''}>Exportar base analítica JSON</button><button id="goalsCsv" ${!data?'disabled':''}>Exportar metas CSV</button></div><div class="upload"><label>Abrir base para conferência local<input id="localFile" type="file" accept=".json"></label><p class="small muted">A conferência local não grava no banco.</p></div><p class="small"><b>Fluxo atual:</b> ERP → Excel → validação no Z-AI → Supabase. Não depende de acesso direto ao PostgreSQL do ERP.</p></article></div>
- <article class="card"><h2>Histórico de importações</h2><p class="desc">${cloud?'Registros persistidos no Supabase':'Histórico incluído no arquivo de conferência'}</p>${table(['Arquivo','Quando','Registros','Valor','Tipo'],(data?.historico||[]).map(r=>[esc(r.file||''),esc(r.when?new Date(r.when).toLocaleString('pt-BR'):''),num(r.rows||0),money(r.value||0),esc(r.tipo||'Backup histórico')]))}</article>`;}
+ <article class="card"><div class="section-title compact"><div><span class="section-kicker">RASTREABILIDADE</span><h2>Histórico de importações</h2></div></div><p class="desc">Desfaça apenas lotes elegíveis, com confirmação e justificativa. O registro do lote permanece auditável. Cargas substitutivas e lotes sem restauração segura exigem análise administrativa.</p><div id="importHistoryGrid">${cloud?'<div class="loading-state">Consultando histórico seguro da loja…</div>':table(['Arquivo','Quando','Registros','Valor','Tipo'],(data?.historico||[]).map(r=>[esc(r.file||''),esc(r.when?new Date(r.when).toLocaleString('pt-BR'):''),num(r.rows||0),money(r.value||0),esc(r.tipo||'Backup histórico')]))}</div></article>`;}
 function empty(){return `<article class="card empty"><span class="number">Z</span><h2>Seu painel, conectado às suas lojas</h2><p>Entre na conta do Supabase para consultar os dados salvos. Para conferir esta versão antes da ativação, abra <b>data/base_conferida.json</b> no menu Importar e Exportar.</p><div class="actions" style="justify-content:center"><button class="primary" id="emptyLogin">Conectar Supabase</button><button id="emptyLocal">Abrir base de conferência</button></div></article>`;}
 function render(){
  $('#nav').innerHTML=names.map((n,i)=>`<button data-page="${i}" class="${page===i?'active':''}" title="${esc(n)}" aria-label="${esc(n)}" aria-current="${page===i?'page':'false'}"><span class="navicon" aria-hidden="true">${navIcons[i]}</span><span class="navlabel">${n}</span></button>`).join('');$('#nav').querySelectorAll('button').forEach(b=>b.onclick=()=>{page=+b.dataset.page;msg('');render()});
@@ -552,7 +602,7 @@ function render(){
  if(page===2&&data){$('#productStatus').value=productStatus;renderProducts();loadSalesProducts();$('#productSearch').oninput=e=>{productQuery=e.target.value;productPage=0;renderProducts()};$('#productStatus').onchange=e=>{productStatus=e.target.value;productPage=0;renderProducts()};$('#salesCsv').onclick=()=>csv('vendas_produtos_'+activeStore+'.csv',['Loja','SKU','Produto','Departamento','Quantidade origem','Vendas'],products().map(x=>[activeStore,x.sku,x.produto,x.dept,String(x.qty).replace('.',','),x.value.toFixed(2).replace('.',',')]))}
  if(page===6&&data)bindTradePage();
  if(page===3&&data){$('#compareApply').onclick=()=>{compareAFrom=$('#cmpAFrom').value;compareATo=$('#cmpATo').value;compareBFrom=$('#cmpBFrom').value;compareBTo=$('#cmpBTo').value;compareDept=$('#cmpDept').value;if(!compareAFrom||!compareATo||!compareBFrom||!compareBTo||compareAFrom>compareATo||compareBFrom>compareBTo){msg('Informe períodos válidos para A e B.',true);return}msg('');render()};$('#compareCsv').onclick=()=>{const a=consolidatedDepartments(compareAFrom,compareATo,compareDept),b=consolidatedDepartments(compareBFrom,compareBTo,compareDept),map=new Map();for(const r of a)map.set(r.code,{code:r.code,name:r.name,a:r.consolidated,b:0});for(const r of b){if(!map.has(r.code))map.set(r.code,{code:r.code,name:r.name,a:0,b:0});map.get(r.code).b=r.consolidated}csv('comparacao_periodos_'+activeStore+'.csv',['Departamento','Consolidada A','Consolidada B','Variação B-A'],[...map.values()].map(r=>[r.code+' · '+r.name,String(r.a).replace('.',','),String(r.b).replace('.',','),String(r.b-r.a).replace('.',',')]))}};
- if(page===7){$('#localFile').onchange=async e=>{try{const f=e.target.files[0];if(!f)return;const d=JSON.parse(await f.text());setData(d,false);msg('Arquivo aberto para conferência. Nenhum dado foi enviado ao banco.')}catch(e){msg(e.message,true)}};$('#backup').onclick=()=>download('Base_Analitica_ZAI_'+activeStore+'_' +new Date().toISOString().slice(0,10)+'.json',JSON.stringify(data));$('#goalsCsv').onclick=()=>csv('metas_'+activeStore+'.csv',['Departamento','Participação %','Meta diaria R$','Meta perdas %'],(data.metas||[]).map(r=>[r.descricao,(r.participacao*100).toFixed(2).replace('.',','),ZAI.dailyGoal(data,r.codigo)==null?'':ZAI.dailyGoal(data,r.codigo).toFixed(2).replace('.',','),r.meta_perda==null?'':(r.meta_perda*100).toFixed(2).replace('.',',')]));$('#lossFile').onchange=e=>previewByType(e.target.files[0]);bindImportType();$('#importMode').onchange=()=>{pending=null;$('#lossFile').value='';$('#importPreview').innerHTML='Selecione novamente o arquivo para conferir este modo.'}}
+ if(page===7){$('#localFile').onchange=async e=>{try{const f=e.target.files[0];if(!f)return;const d=JSON.parse(await f.text());setData(d,false);msg('Arquivo aberto para conferência. Nenhum dado foi enviado ao banco.')}catch(e){msg(e.message,true)}};$('#backup').onclick=()=>download('Base_Analitica_ZAI_'+activeStore+'_' +new Date().toISOString().slice(0,10)+'.json',JSON.stringify(data));$('#goalsCsv').onclick=()=>csv('metas_'+activeStore+'.csv',['Departamento','Participação %','Meta diaria R$','Meta perdas %'],(data.metas||[]).map(r=>[r.descricao,(r.participacao*100).toFixed(2).replace('.',','),ZAI.dailyGoal(data,r.codigo)==null?'':ZAI.dailyGoal(data,r.codigo).toFixed(2).replace('.',','),r.meta_perda==null?'':(r.meta_perda*100).toFixed(2).replace('.',',')]));$('#lossFile').onchange=e=>previewByType(e.target.files[0]);bindImportType();loadImportHistory();$('#importMode').onchange=()=>{pending=null;$('#lossFile').value='';$('#importPreview').innerHTML='Selecione novamente o arquivo para conferir este modo.'}}
 }
 
 const IMPORT_GUIDES={

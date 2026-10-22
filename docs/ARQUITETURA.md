@@ -59,6 +59,7 @@ A seta GitHub → Python → Vercel representa o **processo de build disponível
 | `web/app.js` | Menus, renderização, importadores, autenticação, ETL, páginas de Vendas/Trocas, upload e histórico |
 | `web/ui.js` | Componentes e interação para Perdas Reconhecidas e Auditorias, paginação e navegação |
 | `web/product360.js` e `web/product360.css` | Ficha e busca por SKU com consulta transacional e detalhamento das fontes |
+| `web/tradeTasks.js`, `web/recurrence.js` e `web/operations.css` | Fluxo operacional de fornecedores e análise de reincidência |
 | `web/config.example.js` | Exemplo de configuração pública — copiar para `web/config.js` localmente |
 | `database/*.sql` | Esquema, permissões, migrações, importações, indicadores, consultas e reversões |
 | `tools/build_frontend.py` | Copia `web/` para `dist/` e gera `config.js` com variáveis **públicas** de build |
@@ -154,3 +155,13 @@ sequenceDiagram
 - **Escala multiloja** exige testar layouts operacionais de cada filial, cadastros e roles; a Loja 007 continua sendo a unidade homologada.
 
 Consulte [ETL e Importações](ETL_E_IMPORTACOES.md) para contratos de entrada e [Roadmap](ROADMAP.md) para os próximos passos.
+
+
+## Evoluções de outubro/2026
+
+- `database/25_trocas_2_recorrencia.sql`: cria `montekali.trocas_acompanhamentos`, eventos auditáveis e quatro RPCs autenticadas (leitura, gravação e histórico de tratativas; recorrência por SKU).
+- `web/tradeTasks.js`: fila de acompanhamento com status, responsáveis, vencimentos e justificativas.
+- `web/recurrence.js`: análise de perdas repetidas por dias distintos com filtros e drill-down no Produto 360°.
+- A importação de Trocas permanece independente das tarefas: novos snapshots de posição não devem sobrescrever histórico ou tratativas.
+
+Referências avaliadas: [engenharia reversa](REFERENCIAS_ENGENHARIA_REVERSA.md).

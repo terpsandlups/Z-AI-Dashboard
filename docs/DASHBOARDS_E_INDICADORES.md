@@ -6,7 +6,7 @@
 
 ## Visão geral
 
-O frontend apresenta **oito módulos**, trabalhando sobre os dados da loja selecionada e, quando aplicável, dos intervalos de data inicial/final e departamento.
+O frontend apresenta **nove módulos**, trabalhando sobre os dados da loja selecionada e, quando aplicável, dos intervalos de data inicial/final e departamento.
 
 | Módulo | Pergunta operacional | Recursos existentes |
 |---|---|---|
@@ -18,6 +18,7 @@ O frontend apresenta **oito módulos**, trabalhando sobre os dados da loja selec
 | **6. Perdas Consolidadas** | Qual é a perda total combinando as fontes? | Quebra reconhecida + falta − sobra, classificação por origem, metas |
 | **7. Estoque de Trocas** | Quanto está parado e como tratar por fornecedor? | Posição atual, Fornecedor 360°, marcas, categorias, CSV filtrado |
 | **8. Central de Importações** | Como atualizar e corrigir a base sem perder rastreabilidade? | Upload, ETL, prévia, confirmação, histórico e desfazer elegível |
+| **9. Produto 360°** | O que aconteceu com um SKU no período? | Busca por código/descrição; venda, quebras, faltas, sobras, linha do tempo e lotes |
 
 **Filtros globais e locais:** a navegação usa filtros de loja e, nos módulos aplicáveis, de período e departamento. Algumas análises adicionam busca por **SKU/nome**, categoria/motivo, situação, fornecedor, marca e tratativa.
 
@@ -198,8 +199,12 @@ Além de estética e número de gráficos, os critérios operacionais devem ser:
 5. **Ação mensurável:** hipótese, responsável, correção e acompanhamento (o plano de ação completo é uma fase futura).
 6. **Comparabilidade:** variação por dia/período só quando as fontes cobrem o mesmo escopo.
 
-### Próxima fronteira: Produto 360° (planejado)
+### 9. Produto 360° — primeira entrega
 
-Uma consulta central por SKU que consolide **venda total, perdas reconhecidas, faltas, sobras, resultado líquido, percentual sobre vendas e linha do tempo** em um só lugar, com acesso a partir de tabelas do dashboard. Hoje essas informações estão distribuídas em páginas/consultas; não declarar a ficha unificada como pronta.
+Página própria no menu, com busca por código ou descrição e atalho nas tabelas de Vendas, Perdas Reconhecidas e Auditorias. A RPC `zai_produto_360` reúne as fontes **sem multiplicar valores entre tabelas de fatos**, entrega totais, quantidades, motivos, departamentos, evolução diária e até 200 movimentos recentes com lote de origem.
+
+**Cobertura:** a taxa `perda consolidada / vendas` só aparece quando todos os dias do intervalo têm cobertura diária confirmada; totais parciais continuam identificados como não comparáveis. O CSV de lançamentos respeita o limite retornado pela consulta. A base SQL e o rendering do módulo foram testados; a homologação visual/autenticada segue como etapa final.
+
+Próximas iterações: intervalos maiores, paginação detalhada de movimentos, comparativo entre lojas com permissão e vínculo com planos de ação.
 
 [Ver fases seguintes e critérios de aceite →](ROADMAP.md)

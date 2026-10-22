@@ -3,7 +3,7 @@ let tradeTasks=[],tradeTaskLoaded='',tradeTaskBusy=false,tradeTaskError='',trade
 const tradeTaskStatuses={pendente:'Pendente',em_contato:'Em contato',aguardando_retorno:'Aguardando retorno',concluida:'Concluída',cancelada:'Cancelada'};
 const taskStatus=s=>tradeTaskStatuses[s]||'Sem acompanhamento';
 const taskOpen=s=>!['concluida','cancelada'].includes(s);
-const taskToday=()=>new Date().toLocaleDateString('en-CA');
+const taskToday=()=>{const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')};
 function tradeTaskRows(){
  const rows=tradeSupplierRows(tradeFilteredItems()),set=new Set(rows.map(r=>String(r.fornecedor_codigo)));
  return rows.map(x=>({...x,acomp:tradeTasks.find(t=>t.fornecedor_codigo===String(x.fornecedor_codigo))||null}))

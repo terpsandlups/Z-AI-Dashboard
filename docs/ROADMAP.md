@@ -23,7 +23,7 @@
 **Entregas presentes no repositório e banco piloto:**
 
 - [x] Layout executivo com navegação lateral.
-- [x] Oito áreas: Executivo, Perdas, Vendas, Comparador, Auditorias, Consolidadas, Trocas e Importações.
+- [x] Nove áreas: Executivo, Perdas, Vendas, Comparador, Auditorias, Consolidadas, Trocas e Importações.
 - [x] JavaScript/HTML/CSS estático, hospedagem em Vercel.
 - [x] PostgreSQL/Supabase para autenticação, persistência, resumos e funções SQL.
 - [x] Controle de acesso a lojas autorizadas; papéis `consulta` e `importador`.

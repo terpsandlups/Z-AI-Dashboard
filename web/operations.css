@@ -1,0 +1,38 @@
+/* Z-AI · Trocas 2.0 e Inteligência de Recorrência.
+   Adaptado ao visual existente: informações operacionais primeiro, charts de diagnóstico depois. */
+.trade-workflow{display:grid;gap:16px;margin:16px 0 20px}
+.trade-workflow .card{min-width:0}
+.workflow-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:15px}
+.workflow-kpis>div{display:flex;flex-direction:column;gap:5px;background:var(--surface,#f7f9fc);border:1px solid var(--border,#e3e8ee);border-radius:11px;padding:14px 16px;min-width:0}
+.workflow-kpis small{font-size:11px;color:var(--muted,#64748b);font-weight:650}
+.workflow-kpis strong{font-size:23px;line-height:1.15;font-weight:750;font-variant-numeric:tabular-nums}
+.workflow-state{display:inline-block;border-radius:7px;padding:5px 9px;font-size:11px;font-weight:750;background:#eef3f8;color:#314b65;white-space:nowrap}
+.workflow-state.em_contato{background:#eaf3ff;color:#225a9b}
+.workflow-state.aguardando_retorno{background:#fff4dc;color:#825713}
+.workflow-state.concluida{background:#e9f7ed;color:#26713c}
+.workflow-state.cancelada{background:#f2f3f5;color:#62676d}
+.workflow-overdue{color:#b54141;font-size:11px}
+.workflow-dialog{border:1px solid #d5dee8;border-radius:16px;background:#fff;color:#152738;width:min(760px,calc(100vw - 24px));max-height:90vh;overflow:auto;padding:23px;box-shadow:0 25px 80px rgba(15,34,52,.25)}
+.workflow-dialog::backdrop{background:rgba(8,19,32,.55)}
+.workflow-dialog form{display:grid;gap:13px}
+.workflow-dialog h2{margin:0}
+.workflow-dialog label{display:flex;flex-direction:column;font-size:12px;font-weight:650;gap:5px}
+.workflow-dialog input,.workflow-dialog select,.workflow-dialog textarea{width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:10px;background:#fff;color:inherit;font:inherit}
+.workflow-dialog textarea{resize:vertical}
+.workflow-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.workflow-history{padding:12px 15px;border:1px solid #e5e9f0;border-radius:9px;max-height:180px;overflow:auto}
+.workflow-history h3{font-size:12px;margin:0 0 5px}
+.workflow-history p{font-size:11px;border-bottom:1px solid #e7ebf0;margin:0;padding:7px 0}
+.workflow-dialog .actions{display:flex;justify-content:flex-end;gap:10px}
+.rec-head h2{font-size:23px;margin:5px 0}
+.rec-head .desc{max-width:920px}
+.rec-filters{display:grid;grid-template-columns:repeat(3,minmax(150px,1fr)) minmax(150px,1.25fr) auto;gap:12px;align-items:end;margin:18px 0 10px}
+.rec-filters label{display:flex;flex-direction:column;gap:5px;font-weight:650;font-size:11px}
+.rec-filters select,.rec-filters input{width:100%;min-height:40px;padding:8px 11px;background:var(--panel,#fff);color:inherit;border:1px solid var(--border,#cfd7e1);border-radius:8px;font-size:12px}
+.rec-actions{display:flex;gap:8px}
+.rec-actions button{min-height:40px;font-size:11px;white-space:nowrap}
+.rec-queue .data-grid td:nth-child(7){font-weight:750}
+.rec-queue .p360-link{min-width:150px}
+.rec-charts .card{min-width:0}
+@media(max-width:1100px){.rec-filters{grid-template-columns:repeat(2,minmax(160px,1fr))}.rec-actions{align-items:end}}
+@media(max-width:700px){.workflow-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.workflow-form,.rec-filters{grid-template-columns:1fr}.rec-actions button{flex:1}.workflow-dialog{padding:15px}.rec-head h2{font-size:19px}}

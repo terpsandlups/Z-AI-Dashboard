@@ -44,6 +44,7 @@ function p360AsText(date){
 
 function p360Page(){
  if(!data)return `<article class="card"><h2>Produto 360°</h2><p>Entre na conta para pesquisar os produtos autorizados para a loja.</p></article>`;
+ if(!cloud)return `<article class="card"><h2>Produto 360°</h2><p>Esta ficha consulta o Supabase em tempo real. Conecte uma conta autorizada da loja; a base de conferência local não possui os movimentos detalhados de venda e inventário.</p></article>`;
  const selectTitle=p360Sku?(data.produtos?.[p360Sku]?.[0]||p360Sku):'';
  const chosen=p360Result?.sku===p360Sku?p360Result:null;
  const d=chosen?.totais||{};
@@ -124,6 +125,7 @@ function p360Bind(){
  };
  $('#p360Clear').onclick=()=>{p360Sku='';p360Query='';p360Result=null;p360Error='';p360CacheKey='';p360PendingKey='';p360RequestId++;render()};
  p360BindSuggestions();
+ document.querySelectorAll('.p360-quick [data-p360-pick]').forEach(b=>b.onclick=()=>p360SelectSku(b.dataset.p360Pick));
  if($('#p360More'))$('#p360More').onclick=()=>{p360Limit=Math.min(200,p360Limit+70);render()};
  if($('#p360Export'))$('#p360Export').onclick=()=>{
   const rows=p360Result?.movimentos||[];

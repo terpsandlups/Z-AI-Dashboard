@@ -6,7 +6,7 @@
 
 ## Visão geral
 
-O frontend apresenta **nove módulos**, trabalhando sobre os dados da loja selecionada e, quando aplicável, dos intervalos de data inicial/final e departamento.
+O frontend apresenta **dez módulos**, trabalhando sobre os dados da loja selecionada e, quando aplicável, dos intervalos de data inicial/final e departamento.
 
 | Módulo | Pergunta operacional | Recursos existentes |
 |---|---|---|
@@ -19,6 +19,7 @@ O frontend apresenta **nove módulos**, trabalhando sobre os dados da loja selec
 | **7. Estoque de Trocas** | Quanto está parado e como tratar por fornecedor? | Posição atual, Fornecedor 360°, marcas, categorias, CSV filtrado |
 | **8. Central de Importações** | Como atualizar e corrigir a base sem perder rastreabilidade? | Upload, ETL, prévia, confirmação, histórico e desfazer elegível |
 | **9. Produto 360°** | O que aconteceu com um SKU no período? | Busca por código/descrição; venda, quebras, faltas, sobras, linha do tempo e lotes |
+| **10. Inteligência de Recorrência** | Que produtos quebram repetidamente em dias diferentes? | Soma por SKU, dias com perda, maior lançamento, média por dia, ranking e CSV |
 
 **Filtros globais e locais:** a navegação usa filtros de loja e, nos módulos aplicáveis, de período e departamento. Algumas análises adicionam busca por **SKU/nome**, categoria/motivo, situação, fornecedor, marca e tratativa.
 
@@ -208,3 +209,14 @@ Página própria no menu, com busca por código ou descrição e atalho nas tabe
 Próximas iterações: intervalos maiores, paginação detalhada de movimentos, comparativo entre lojas com permissão e vínculo com planos de ação.
 
 [Ver fases seguintes e critérios de aceite →](ROADMAP.md)
+
+
+### Trocas 2.0 — primeira entrega
+
+A página de Trocas integra uma fila independente dos arquivos de posição. Cada fornecedor pode ter um responsável, prazo, status (pendente, em contato, aguardando retorno, concluída ou cancelada), próxima ação e observação. Alterações são auditadas no Supabase, e apenas perfil importador pode gravar. Concluir uma tarefa **não reduz estoque** automaticamente.
+
+### 10. Inteligência de Recorrência — primeira entrega
+
+A consulta agrupa perdas reconhecidas por **loja + SKU + departamento**. Usa `COUNT(DISTINCT data_movimento)` para dias com quebra, `COUNT(*)` para ocorrências e `SUM(valor)` para o acumulado. Permite ordenar por impacto ou frequência, definir mínimo de dias e excluir produtos cujo **maior lançamento** ultrapasse um limite escolhido. O usuário pode exportar o CSV e abrir o Produto 360°.
+
+Ver [referências de engenharia reversa](REFERENCIAS_ENGENHARIA_REVERSA.md) para limites, fontes open source e decisões técnicas.

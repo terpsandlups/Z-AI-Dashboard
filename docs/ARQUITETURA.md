@@ -58,6 +58,7 @@ A seta GitHub → Python → Vercel representa o **processo de build disponível
 | `web/core.js` | Funções puras de cálculo, calendário, cobertura, metas e seleções; compartilha lógica com testes |
 | `web/app.js` | Menus, renderização, importadores, autenticação, ETL, páginas de Vendas/Trocas, upload e histórico |
 | `web/ui.js` | Componentes e interação para Perdas Reconhecidas e Auditorias, paginação e navegação |
+| `web/product360.js` e `web/product360.css` | Ficha e busca por SKU com consulta transacional e detalhamento das fontes |
 | `web/config.example.js` | Exemplo de configuração pública — copiar para `web/config.js` localmente |
 | `database/*.sql` | Esquema, permissões, migrações, importações, indicadores, consultas e reversões |
 | `tools/build_frontend.py` | Copia `web/` para `dist/` e gera `config.js` com variáveis **públicas** de build |
@@ -101,6 +102,7 @@ Principais estruturas lógicas sob o esquema `montekali` (os nomes exatos devem 
 - `zai_importar_vendas`, `zai_importar_perdas`, `zai_importar_auditorias`, `zai_importar_trocas`: cargas transacionais.
 - `zai_auditorias_periodo`: consulta detalhada e ordenação/paginação das auditorias.
 - `zai_vendas_produtos_periodo`: vendas por produto no recorte solicitado.
+- `zai_produto_360`: consulta por SKU com fontes de vendas, perdas e auditorias agregadas sem JOIN entre fatos.
 - `zai_historico_importacoes` e `zai_desfazer_importacao`: auditoria de lotes e reversão condicionada.
 
 Muitas funções são `SECURITY DEFINER` para encapsular acesso controlado às tabelas; por isso, devem **validar `auth.uid()`, loja e perfil dentro da função**. O acesso anônimo à operação de desfazer foi explicitamente revogado. Não conceda execução irrestrita de funções privilegiadas.
@@ -146,7 +148,7 @@ sequenceDiagram
 - **Sem integração ERP automática** nesta fase: a origem é arquivo exportado pelo ERP e conferido pelo operador.
 - **Sem API de back-end própria em PHP/Python**: as operações de banco são RPCs SQL, e o app usa JS.
 - **Sem atualização automática de custos/estoques** para prever compras; giro/cobertura exigirão mais dados.
-- **Sem ficha completa Produto 360°** por enquanto; os dados existem separados em módulos e devem ser reunidos por chave/cobertura.
+- **Produto 360° implementado como MVP** com fontes separadas e percentuais somente quando há cobertura completa. Paginação integral da trilha e homologação visual por perfil ainda são evoluções.
 - **Vendas mensais + vendas diárias** não são somadas indiscriminadamente. Cobertura comparável governa percentuais.
 - **Rastreabilidade** prioriza manter histórico em vez de apagar registros de importação. Reversão só quando dependências e restauração forem seguras.
 - **Escala multiloja** exige testar layouts operacionais de cada filial, cadastros e roles; a Loja 007 continua sendo a unidade homologada.

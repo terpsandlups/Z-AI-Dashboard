@@ -594,7 +594,7 @@ function render(){
  const notices=[];if(context.cut)notices.push('Indicadores comparáveis até '+context.cut.split('-').reverse().join('/')+'.');if(context.unmatchedLossCount)notices.push(num(context.unmatchedLossCount)+' lançamentos posteriores às vendas continuam visíveis em Perdas Reconhecidas.');if(context.missing.length)notices.push('Sem venda diária completa em '+context.missing.join(', ')+'.');if(!context.comparable&&!context.missing.length)notices.push('O percentual exige cobertura compatível entre vendas e perdas.');
  $('#coverage').innerHTML=notices.length?`<div class="notice coverage-summary">${notices.map(esc).join(' · ')}</div>`:'';
  }
- $('#content').innerHTML=page===7?exchange():page===8?product360Page():page===9?recPage():!data?empty():page===0?executive():page===1?losses():page===2?sales():page===3?compare():future();
+ $('#content').innerHTML=page===7?exchange():page===8?p360Page():page===9?recPage():!data?empty():page===0?executive():page===1?losses():page===2?sales():page===3?compare():future();
  if($('#emptyLogin'))$('#emptyLogin').onclick=()=>$('#login').showModal();if($('#emptyLocal'))$('#emptyLocal').onclick=()=>{page=7;render();$('#localFile').click()};
  document.querySelectorAll('[data-focus-dept]').forEach(el=>el.onclick=()=>{$('#dept').value=el.dataset.focusDept;page=0;render()});
  document.querySelectorAll('[data-loss-kind]').forEach(el=>el.onclick=()=>{lossKind=el.dataset.lossKind;page=1;render()});

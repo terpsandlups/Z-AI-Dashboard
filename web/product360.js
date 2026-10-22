@@ -1,5 +1,5 @@
 /* Produto 360°: dados consultados diretamente na RPC, sem somar tabelas de fatos por JOIN. */
-let p360Sku='',p360Query='',p360Result=null,p360Error='',p360Loading=false,p360CacheKey='',p360PendingKey='',p360Limit=60;
+let p360Sku='',p360Query='',p360Result=null,p360Error='',p360Loading=false,p360CacheKey='',p360PendingKey='',p360Limit=60,p360RequestId=0;
 
 function p360Options(){
  if(!data?.produtos)return [];
@@ -101,7 +101,7 @@ function p360Page(){
 
 function p360SelectSku(sku){
  if(!/^\d{1,32}$/.test(String(sku)))return;
- p360Sku=String(sku);p360Query=String(sku);p360Result=null;p360Error='';p360CacheKey='';p360PendingKey='';p360Limit=60;
+ p360Sku=String(sku);p360Query=String(sku);p360Result=null;p360Error='';p360CacheKey='';p360PendingKey='';p360Limit=60;p360RequestId++;
  page=8;render();
 }
 
@@ -122,7 +122,7 @@ function p360Bind(){
   if(options.length===1)return p360SelectSku(options[0].sku);
   msg('Selecione um SKU da lista de resultados para consultar a ficha.',true);
  };
- $('#p360Clear').onclick=()=>{p360Sku='';p360Query='';p360Result=null;p360Error='';p360CacheKey='';p360PendingKey='';render()};
+ $('#p360Clear').onclick=()=>{p360Sku='';p360Query='';p360Result=null;p360Error='';p360CacheKey='';p360PendingKey='';p360RequestId++;render()};
  p360BindSuggestions();
  if($('#p360More'))$('#p360More').onclick=()=>{p360Limit=Math.min(200,p360Limit+70);render()};
  if($('#p360Export'))$('#p360Export').onclick=()=>{
@@ -139,8 +139,9 @@ async function p360Load(){
  if(!cloud||!session||page!==8||!p360Sku)return;
  const from=$('#from')?.value||'',to=$('#to')?.value||'',dept=$('#dept')?.value||'';
  const key=[activeStore,p360Sku,from,to,dept,data?.revision].join('|');
- if(key===p360CacheKey&&p360Result)return;
+ if(key===p360CacheKey&&(p360Result||p360Error))return;
  if(key===p360PendingKey)return;
+ const token=++p360RequestId;
  p360PendingKey=key;p360Loading=true;p360Error='';p360Result=null;
  const target=$('#p360Query');
  if(target)target.disabled=true;
@@ -148,8 +149,8 @@ async function p360Load(){
   const response=await request('/rest/v1/rpc/zai_produto_360',{
     p_loja:activeStore,p_sku:p360Sku,p_de:from,p_ate:to,p_dpto:dept||null
   });
-  if(key!==[activeStore,p360Sku,$('#from')?.value||'',$('#to')?.value||'',$('#dept')?.value||'',data?.revision].join('|')||page!==8)return;
+  if(token!==p360RequestId||key!==[activeStore,p360Sku,$('#from')?.value||'',$('#to')?.value||'',$('#dept')?.value||'',data?.revision].join('|')||page!==8)return;
   p360Result=response;p360CacheKey=key;
- }catch(e){if(page===8)p360Error=e.message||'Falha ao consultar produto';}
- finally{p360Loading=false;p360PendingKey='';if(page===8)render();}
+ }catch(e){if(page===8&&token===p360RequestId){p360Error=e.message||'Falha ao consultar produto';p360CacheKey=key;}}
+ finally{if(token===p360RequestId){p360Loading=false;p360PendingKey='';if(page===8)render();}}
 }

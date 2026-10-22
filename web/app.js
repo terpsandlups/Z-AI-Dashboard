@@ -1,8 +1,8 @@
 'use strict';
 const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=n=>n==null?'—':new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(n), num=n=>new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2}).format(n), pct=n=>n==null?'—':num(n*100)+'%', pp=n=>n==null?'—':(n>0?'+':'')+num(n*100)+' p.p.';
-const names=['Visão Executiva','Perdas Reconhecidas','Vendas & Participação','Comparador de Períodos','Perdas Desconhecidas · Inventário','Perdas Consolidadas','Estoque de Trocas','Central de Importações'];
-const subtitles=['Indicadores consolidados da operação','Quebras reconhecidas e recorrências','Faturamento e participação por departamento','Evolução entre dois períodos','Faltas, sobras e resultado de inventário','Visão integrada de todas as perdas','Gestão de fornecedores, marcas e tratativas','Atualização segura das bases operacionais'];
+const names=['Visão Executiva','Perdas Reconhecidas','Vendas & Participação','Comparador de Períodos','Perdas Desconhecidas · Inventário','Perdas Consolidadas','Estoque de Trocas','Central de Importações','Produto 360°'];
+const subtitles=['Indicadores consolidados da operação','Quebras reconhecidas e recorrências','Faturamento e participação por departamento','Evolução entre dois períodos','Faltas, sobras e resultado de inventário','Visão integrada de todas as perdas','Gestão de fornecedores, marcas e tratativas','Atualização segura das bases operacionais','Vendas, perdas e inventário no mesmo SKU'];
 const navIcons=[
  '<svg viewBox="0 0 24 24"><rect x="3" y="11" width="4" height="8" rx="1"/><rect x="10" y="6" width="4" height="13" rx="1"/><rect x="17" y="3" width="4" height="16" rx="1"/></svg>',
  '<svg viewBox="0 0 24 24"><path d="M4 6h16M6 9l4 4 4-3 4 5"/><path d="M18 11v4h-4"/></svg>',
@@ -11,7 +11,8 @@ const navIcons=[
  '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M15.5 15.5L21 21"/></svg>',
  '<svg viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/><path d="M8 3v4M14 10v4M18 17v4"/></svg>',
  '<svg viewBox="0 0 24 24"><path d="M4 7.5L12 3l8 4.5v9L12 21l-8-4.5z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></svg>',
- '<svg viewBox="0 0 24 24"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>'
+ '<svg viewBox="0 0 24 24"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>',
+ '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 8h10M7 12h10M7 16h6"/></svg>'
 ];
 const TRADE_BRAND_OVERRIDES={
  '30074':'Seara','31933':'Seara',
@@ -368,7 +369,8 @@ function renderProducts(){
  if(!$('#products'))return;
  if(salesProductLoading){$('#products').innerHTML='<div class="loading-state">Carregando produtos do período…</div>';return}
  const list=products(),size=40,max=Math.max(1,Math.ceil(list.length/size));productPage=Math.min(productPage,max-1);
- $('#products').innerHTML=list.length?table(['Produto / SKU','Departamento','Situação atual','Quantidade¹','Vendas'],list.slice(productPage*size,(productPage+1)*size).map(x=>[esc(x.produto+' · '+x.sku),esc(data.departamentos[x.dept]||x.dept),esc(x.status||'Nao informado'),num(x.qty),money(x.value)]))+`<div class="actions"><button id="prevProducts" ${productPage===0?'disabled':''}>Anterior</button><span class="small">Página ${productPage+1} / ${max} · ${num(list.length)} produtos/departamentos</span><button id="nextProducts" ${productPage>=max-1?'disabled':''}>Próxima</button></div><p class="small muted">¹ Quantidade na unidade de origem de cada SKU.</p>`:'<div class="empty-inline">Sem detalhe diário por produto para este período.</div>';
+ $('#products').innerHTML=list.length?table(['Produto / SKU','Departamento','Situação atual','Quantidade¹','Vendas'],list.slice(productPage*size,(productPage+1)*size).map(x=>['<button type="button" class="p360-link" data-open-360="'+esc(x.sku)+'" title="Abrir Produto 360°">'+esc(x.produto+' · '+x.sku)+' ↗</button>',esc(data.departamentos[x.dept]||x.dept),esc(x.status||'Nao informado'),num(x.qty),money(x.value)]))+`<div class="actions"><button id="prevProducts" ${productPage===0?'disabled':''}>Anterior</button><span class="small">Página ${productPage+1} / ${max} · ${num(list.length)} produtos/departamentos</span><button id="nextProducts" ${productPage>=max-1?'disabled':''}>Próxima</button></div><p class="small muted">¹ Quantidade na unidade de origem de cada SKU.</p>`:'<div class="empty-inline">Sem detalhe diário por produto para este período.</div>';
+ document.querySelectorAll('[data-open-360]').forEach(b=>b.onclick=()=>p360SelectSku(b.dataset.open360));
  if($('#prevProducts'))$('#prevProducts').onclick=()=>{productPage--;renderProducts()};if($('#nextProducts'))$('#nextProducts').onclick=()=>{productPage++;renderProducts()}
 }
 function compare(){
@@ -586,11 +588,11 @@ function empty(){return `<article class="card empty"><span class="number">Z</spa
 function render(){
  $('#nav').innerHTML=names.map((n,i)=>`<button data-page="${i}" class="${page===i?'active':''}" title="${esc(n)}" aria-label="${esc(n)}" aria-current="${page===i?'page':'false'}"><span class="navicon" aria-hidden="true">${navIcons[i]}</span><span class="navlabel">${n}</span></button>`).join('');$('#nav').querySelectorAll('button').forEach(b=>b.onclick=()=>{page=+b.dataset.page;msg('');render()});
  $('#pageTitle').textContent=names[page];$('.subtitle').textContent=subtitles[page]||'Dashboard Executivo';$('#filters').hidden=!data||page===3||page===6||page===7;$('#coverage').innerHTML='';$('#stamp').textContent='Consultado em '+new Date().toLocaleString('pt-BR');
- if(data&&[0,1,2,4,5].includes(page)){let from=$('#from').value,to=$('#to').value;if(!from||!to||from>to){msg('Informe datas válidas, com início anterior ao fim.',true);return}context=ZAI.select(data,from,to,$('#dept').value);$('#periodNote').textContent=context.days+' dias no período · '+(context.sources.length?context.sources.join(' / '):'vendas não disponíveis');
+ if(data&&[0,1,2,4,5,8].includes(page)){let from=$('#from').value,to=$('#to').value;if(!from||!to||from>to){msg('Informe datas válidas, com início anterior ao fim.',true);return}context=ZAI.select(data,from,to,$('#dept').value);$('#periodNote').textContent=context.days+' dias no período · '+(context.sources.length?context.sources.join(' / '):'vendas não disponíveis');
  const notices=[];if(context.cut)notices.push('Indicadores comparáveis até '+context.cut.split('-').reverse().join('/')+'.');if(context.unmatchedLossCount)notices.push(num(context.unmatchedLossCount)+' lançamentos posteriores às vendas continuam visíveis em Perdas Reconhecidas.');if(context.missing.length)notices.push('Sem venda diária completa em '+context.missing.join(', ')+'.');if(!context.comparable&&!context.missing.length)notices.push('O percentual exige cobertura compatível entre vendas e perdas.');
  $('#coverage').innerHTML=notices.length?`<div class="notice coverage-summary">${notices.map(esc).join(' · ')}</div>`:'';
  }
- $('#content').innerHTML=page===7?exchange():!data?empty():page===0?executive():page===1?losses():page===2?sales():page===3?compare():future();
+ $('#content').innerHTML=page===7?exchange():page===8?product360Page():!data?empty():page===0?executive():page===1?losses():page===2?sales():page===3?compare():future();
  if($('#emptyLogin'))$('#emptyLogin').onclick=()=>$('#login').showModal();if($('#emptyLocal'))$('#emptyLocal').onclick=()=>{page=7;render();$('#localFile').click()};
  document.querySelectorAll('[data-focus-dept]').forEach(el=>el.onclick=()=>{$('#dept').value=el.dataset.focusDept;page=0;render()});
  document.querySelectorAll('[data-loss-kind]').forEach(el=>el.onclick=()=>{lossKind=el.dataset.lossKind;page=1;render()});
@@ -599,6 +601,7 @@ function render(){
  if($('#consolidatedKindFilter'))$('#consolidatedKindFilter').onchange=e=>{consolidatedKind=e.target.value;render()};
  if(page===1&&data)bindLossGrid();
  if(page===4&&data)bindAuditPage();
+ if(page===8&&data)p360Bind();
  if(page===2&&data){$('#productStatus').value=productStatus;renderProducts();loadSalesProducts();$('#productSearch').oninput=e=>{productQuery=e.target.value;productPage=0;renderProducts()};$('#productStatus').onchange=e=>{productStatus=e.target.value;productPage=0;renderProducts()};$('#salesCsv').onclick=()=>csv('vendas_produtos_'+activeStore+'.csv',['Loja','SKU','Produto','Departamento','Quantidade origem','Vendas'],products().map(x=>[activeStore,x.sku,x.produto,x.dept,String(x.qty).replace('.',','),x.value.toFixed(2).replace('.',',')]))}
  if(page===6&&data)bindTradePage();
  if(page===3&&data){$('#compareApply').onclick=()=>{compareAFrom=$('#cmpAFrom').value;compareATo=$('#cmpATo').value;compareBFrom=$('#cmpBFrom').value;compareBTo=$('#cmpBTo').value;compareDept=$('#cmpDept').value;if(!compareAFrom||!compareATo||!compareBFrom||!compareBTo||compareAFrom>compareATo||compareBFrom>compareBTo){msg('Informe períodos válidos para A e B.',true);return}msg('');render()};$('#compareCsv').onclick=()=>{const a=consolidatedDepartments(compareAFrom,compareATo,compareDept),b=consolidatedDepartments(compareBFrom,compareBTo,compareDept),map=new Map();for(const r of a)map.set(r.code,{code:r.code,name:r.name,a:r.consolidated,b:0});for(const r of b){if(!map.has(r.code))map.set(r.code,{code:r.code,name:r.name,a:0,b:0});map.get(r.code).b=r.consolidated}csv('comparacao_periodos_'+activeStore+'.csv',['Departamento','Consolidada A','Consolidada B','Variação B-A'],[...map.values()].map(r=>[r.code+' · '+r.name,String(r.a).replace('.',','),String(r.b).replace('.',','),String(r.b-r.a).replace('.',',')]))}};

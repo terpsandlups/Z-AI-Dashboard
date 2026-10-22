@@ -62,7 +62,7 @@ function recPage(){
 async function recLoad(force=false){
  if(!cloud||!data||page!==9)return;
  const key=recQueryKey();
- if(!force&&recKey===key&&recResult)return;
+ if(!force&&recKey===key&&(recResult||recError))return;
  if(recPending===key)return;
  recPending=key;recError='';
  try{
@@ -73,7 +73,7 @@ async function recLoad(force=false){
    });
    if(page!==9||key!==recQueryKey())return;
    recResult=r;recKey=key;
- }catch(e){if(key===recQueryKey()){recError=e.message;recResult=null;}}
+ }catch(e){if(key===recQueryKey()){recError=e.message;recResult=null;recKey=key;}}
  finally{if(recPending===key)recPending='';if(page===9&&key===recQueryKey())render();}
 }
 function recBind(){

@@ -69,7 +69,7 @@
 
 ---
 
-## Fase 2 — Produto 360° · Próxima funcionalidade analítica
+## Fase 2 — Produto 360° · MVP implementado, evolução contínua
 
 **Objetivo:** pesquisar um SKU e obter um consolidado transversal, não apenas localizar o mesmo produto em telas separadas.
 
@@ -86,7 +86,7 @@
 | Histórico | Linha do tempo de vendas, ocorrências e contagens |
 | Origem dos números | Acesso ao movimento/lote responsável por cada subtotal |
 
-**Entrada:** busca central por SKU/descrição e abertura ao clicar em um produto de outras tabelas. **Não está concluída** no estado atual do projeto.
+**Entrada:** busca central por SKU/descrição e abertura ao clicar em um produto de outras tabelas. **MVP implementado:** consulta autenticada `zai_produto_360` com totais, quantidade, departamentos, motivos, histórico diário, até 200 movimentos com lote e atalhos por SKU. **Pendentes:** validação visual por usuário, paginação completa de detalhes e melhorias de navegação/volumetria.
 
 **Critério de aceite:** para um mesmo SKU, loja e intervalo, os subtotais da ficha devem coincidir com os módulos individuais, respeitando cobertura temporal e evitando multiplicação de linhas por joins.
 

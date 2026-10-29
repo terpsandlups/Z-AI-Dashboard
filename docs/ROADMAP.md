@@ -30,6 +30,7 @@
 - [x] Filtros por data e departamento nas páginas aplicáveis.
 - [x] Metas oficiais por loja/departamento e comparativos meta × realizado.
 - [x] Separação entre venda diária e competência mensal para impedir dupla contagem.
+- [x] Recuperação da consulta de produtos dos meses históricos janeiro–agosto e integração ao Produto 360° sem duplicar vendas.
 - [x] Perdas reconhecidas individuais e acumuladas.
 - [x] Auditorias entrada/sobra e saída/falta, detalhamento e ordenação por valor.
 - [x] Estoque de Trocas por fornecedor, marca, categoria e posição atual.

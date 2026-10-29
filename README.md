@@ -5,7 +5,7 @@
 
 **Transformando relatórios do ERP em indicadores confiáveis, investigação por produto e decisões de loja.**
 
-[🌐 Abrir dashboard na Vercel](https://z-ai-dashboard-preview.vercel.app/) · [📐 Arquitetura](docs/ARQUITETURA.md) · [🔄 ETL e importações](docs/ETL_E_IMPORTACOES.md) · [📊 Dashboards](docs/DASHBOARDS_E_INDICADORES.md) · [🗺️ Roadmap](docs/ROADMAP.md) · [🔎 Engenharia reversa](docs/REFERENCIAS_ENGENHARIA_REVERSA.md)
+[🌐 Abrir dashboard na Vercel](https://z-ai-dashboard-preview.vercel.app/) · [📐 Arquitetura](docs/ARQUITETURA.md) · [🔄 ETL e importações](docs/ETL_E_IMPORTACOES.md) · [📊 Dashboards](docs/DASHBOARDS_E_INDICADORES.md) · [🗺️ Roadmap](docs/ROADMAP.md) · [🔎 Engenharia reversa](docs/REFERENCIAS_ENGENHARIA_REVERSA.md) · [✅ Auditoria de filtros](docs/AUDITORIA_FILTROS_2026-10.md)
 
 **Piloto:** Loja **007 — Kalimera Japy** · Grupo MONTEKALI  
 **Stack:** HTML · CSS · JavaScript · Python · PostgreSQL/Supabase · SQL/PLpgSQL · Vercel · GitHub
@@ -53,7 +53,7 @@ flowchart LR
 | **9. Produto 360°** | Pesquisa por SKU/descrição, venda, perda reconhecida, faltas, sobras, histórico e rastreabilidade por lote |
 | **10. Inteligência de Recorrência** | Analisa SKUs com perdas em dias distintos, valor acumulado, frequência e maior ocorrência |
 
-Os menus estão implementados no frontend. **Alguns recursos dependem de usuário autorizado, migrações SQL aplicadas e dados presentes para a loja selecionada.** Indicadores com cobertura incompleta indicam ausência de comparabilidade, em vez de fabricar percentuais.
+Os menus estão implementados no frontend. **Os filtros de data e departamento usam o botão Aplicar e indicam alterações pendentes; os indicadores diferenciam faturamento diário, competência mensal e fontes insuficientemente cobertas.** **Alguns recursos dependem de usuário autorizado, migrações SQL aplicadas e dados presentes para a loja selecionada.** Indicadores com cobertura incompleta indicam ausência de comparabilidade, em vez de fabricar percentuais.
 
 Veja as regras e as decisões atendidas em **[Dashboards e Indicadores](docs/DASHBOARDS_E_INDICADORES.md)**.
 
@@ -159,6 +159,7 @@ node tests/componentes.cjs
 node tests/importador_vendas.cjs
 node tests/produto360.cjs
 node tests/operations.cjs
+node tests/filtros_periodos.cjs
 python -m unittest discover -s tests -p 'test_*.py'
 ```
 

@@ -129,7 +129,7 @@ function departmentOptions(snapshot){
 }
 const BASE=window.ZAI_CONFIG?.supabaseUrl||'',KEY=window.ZAI_CONFIG?.publishableKey||'';
 let activeStore='',accessibleStores=[],requestVersion=0;
-let data=null,page=0,cloud=false,session=null,context=null,pending=null,appliedFilters=null,compareScopeKey='',productPage=0,productQuery='',activeDept='',productStatus='',compareAFrom='',compareATo='',compareBFrom='',compareBTo='',compareDept='',salesProductRows=[],salesProductKey='',salesProductLoading=false,tradeSupplier='',tradeCategory='',tradeBrand='',tradeQuery='',consolidatedKind='';
+let data=null,page=0,cloud=false,session=null,context=null,pending=null,appliedFilters=null,compareScopeKey='',salesProductToken=0,salesProductError='',productPage=0,productQuery='',activeDept='',productStatus='',compareAFrom='',compareATo='',compareBFrom='',compareBTo='',compareDept='',salesProductRows=[],salesProductKey='',salesProductLoading=false,tradeSupplier='',tradeCategory='',tradeBrand='',tradeQuery='',consolidatedKind='';
 function msg(s,error=false){$('#message').innerHTML=s?`<div class="notice ${error?'error':'info'}">${esc(s)}</div>`:''}
 function download(filename,text,type='application/json'){const u=URL.createObjectURL(new Blob([text],{type})),a=document.createElement('a');a.href=u;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(u),3000)}
 function csv(name,headers,rows){const cell=v=>'"'+String(v??'').replace(/^[=+@-]/,"'").replace(/"/g,'""')+'"';download(name,'\ufeff'+[headers,...rows].map(r=>r.map(cell).join(';')).join('\r\n'),'text/csv;charset=utf-8')}
@@ -142,7 +142,7 @@ async function request(path,body,auth=true){
 function setData(d,isCloud){
  if(d.schema!=='zai-007-v2'||!/^\d{3}$/.test(d.loja)||!Array.isArray(d.perdas)||!d.departamentos||!d.produtos)throw Error('Base analítica incompatível.');
  if(![d.perdas,d.vendas_mensais||[],d.vendas_diarias||[]].every(a=>a.every(r=>Array.isArray(r)&&r.every(x=>typeof x==='string'||typeof x==='number'))))throw Error('Linhas inválidas na base.');
- data=applyOfficialGoals(d);cloud=isCloud;pending=null;activeStore=d.loja;salesProductRows=[];salesProductKey='';tradeSupplier='';tradeCategory='';tradeBrand='';tradeQuery='';syncStores();
+ data=applyOfficialGoals(d);cloud=isCloud;pending=null;activeStore=d.loja;salesProductRows=[];salesProductKey='';salesProductError='';salesProductToken++;tradeSupplier='';tradeCategory='';tradeBrand='';tradeQuery='';syncStores();
  $('#sourceBadge').textContent=isCloud?'Supabase · '+d.loja:'Conferência local · não salva na nuvem';$('#refresh').hidden=!isCloud;$('#logout').hidden=!session;$('#loginOpen').textContent=isCloud?'Conta conectada':'Conectar Supabase';
  $('#dept').innerHTML='<option value="">Todos os departamentos</option>'+departmentOptions(data).map(([k,v])=>`<option value="${esc(k)}">${esc(k+' · '+v)}</option>`).join('');
  const dates=[...(d.dias_vendas_completos||[]),...(d.perdas||[]).map(r=>r[0]),...(d.auditorias_diarias_resumo||[]).map(r=>r[0])].filter(x=>/^\d{4}-\d{2}-\d{2}$/.test(x)).sort();
@@ -368,22 +368,23 @@ function products(){
 }
 async function loadSalesProducts(){
  if(!data||page!==2)return;
- const key=[activeStore,context.start,context.end,$('#dept').value].join('|');
+ const key=[activeStore,context.start,context.end,$('#dept').value,data.revision].join('|');
  if(key===salesProductKey){renderProducts();return}
- salesProductKey=key;salesProductRows=[];salesProductLoading=true;renderProducts();
+ const token=++salesProductToken;
+ salesProductKey=key;salesProductRows=[];salesProductError='';salesProductLoading=true;renderProducts();
  try{
   if(cloud){
    const rows=await request('/rest/v1/rpc/zai_vendas_produtos_periodo',{p_loja:activeStore,p_de:context.start,p_ate:context.end,p_dpto:$('#dept').value||null});
+   if(token!==salesProductToken||key!==[activeStore,$('#from').value,$('#to').value,$('#dept').value,data?.revision].join('|'))return;
    salesProductRows=(rows||[]).map(r=>({sku:String(r.sku),produto:r.produto||String(r.sku),dept:r.dpto,qty:Number(r.quantidade||0),value:Number(r.valor||0),status:r.situacao||'Nao informado'}));
-  }else{
-   salesProductRows=[];
-  }
- }catch(e){msg('Detalhe por produto: '+e.message,true)}
- finally{salesProductLoading=false;if(page===2)renderProducts()}
+  }else salesProductRows=[];
+ }catch(e){if(token===salesProductToken){salesProductError=e.message||'Falha ao consultar produtos';msg('Detalhe por produto: '+salesProductError,true)}}
+ finally{if(token===salesProductToken){salesProductLoading=false;if(page===2)renderProducts()}}
 }
 function renderProducts(){
  if(!$('#products'))return;
  if(salesProductLoading){$('#products').innerHTML='<div class="loading-state">Carregando produtos do período…</div>';return}
+ if(salesProductError){$('#products').innerHTML='<div class="notice error">Não foi possível carregar o detalhe de produtos: '+esc(salesProductError)+'</div>';return}
  const list=products(),size=40,max=Math.max(1,Math.ceil(list.length/size));productPage=Math.min(productPage,max-1);
  $('#products').innerHTML=list.length?table(['Produto / SKU','Departamento','Situação atual','Quantidade¹','Vendas'],list.slice(productPage*size,(productPage+1)*size).map(x=>['<button type="button" class="p360-link" data-open-360="'+esc(x.sku)+'" title="Abrir Produto 360°">'+esc(x.produto+' · '+x.sku)+' ↗</button>',esc(data.departamentos[x.dept]||x.dept),esc(x.status||'Nao informado'),num(x.qty),money(x.value)]))+`<div class="actions"><button id="prevProducts" ${productPage===0?'disabled':''}>Anterior</button><span class="small">Página ${productPage+1} / ${max} · ${num(list.length)} produtos/departamentos</span><button id="nextProducts" ${productPage>=max-1?'disabled':''}>Próxima</button></div><p class="small muted">¹ Quantidade na unidade de origem de cada SKU.</p>`:'<div class="empty-inline">Sem detalhe diário por produto para este período.</div>';
  document.querySelectorAll('[data-open-360]').forEach(b=>b.onclick=()=>p360SelectSku(b.dataset.open360));
@@ -621,9 +622,9 @@ function render(){
  if(page===4&&data)bindAuditPage();
  if(page===8&&data)p360Bind();
  if(page===9&&data)recBind();
- if(page===2&&data){$('#productStatus').value=productStatus;renderProducts();loadSalesProducts();$('#productSearch').oninput=e=>{productQuery=e.target.value;productPage=0;renderProducts()};$('#productStatus').onchange=e=>{productStatus=e.target.value;productPage=0;renderProducts()};$('#salesCsv').onclick=()=>csv('vendas_produtos_'+activeStore+'.csv',['Loja','SKU','Produto','Departamento','Quantidade origem','Vendas'],products().map(x=>[activeStore,x.sku,x.produto,x.dept,String(x.qty).replace('.',','),x.value.toFixed(2).replace('.',',')]))}
+ if(page===2&&data){$('#productStatus').value=productStatus;renderProducts();loadSalesProducts();$('#productSearch').oninput=e=>{productQuery=e.target.value;productPage=0;renderProducts()};$('#productStatus').onchange=e=>{productStatus=e.target.value;productPage=0;renderProducts()};$('#salesCsv').onclick=()=>csv('vendas_produtos_'+activeStore+'_'+context.start+'_'+context.end+'.csv',['Loja','SKU','Produto','Departamento','Quantidade origem','Vendas'],products().map(x=>[activeStore,x.sku,x.produto,x.dept,String(x.qty).replace('.',','),x.value.toFixed(2).replace('.',',')]))}
  if(page===6&&data){bindTradePage();tradeTasksBind();}
- if(page===3&&data){$('#compareApply').onclick=()=>{compareAFrom=$('#cmpAFrom').value;compareATo=$('#cmpATo').value;compareBFrom=$('#cmpBFrom').value;compareBTo=$('#cmpBTo').value;compareDept=$('#cmpDept').value;if(!compareAFrom||!compareATo||!compareBFrom||!compareBTo||compareAFrom>compareATo||compareBFrom>compareBTo){msg('Informe períodos válidos para A e B.',true);return}msg('');render()};$('#compareCsv').onclick=()=>{const a=consolidatedDepartments(compareAFrom,compareATo,compareDept),b=consolidatedDepartments(compareBFrom,compareBTo,compareDept),map=new Map();for(const r of a)map.set(r.code,{code:r.code,name:r.name,a:r.consolidated,b:0});for(const r of b){if(!map.has(r.code))map.set(r.code,{code:r.code,name:r.name,a:0,b:0});map.get(r.code).b=r.consolidated}csv('comparacao_periodos_'+activeStore+'.csv',['Departamento','Consolidada A','Consolidada B','Variação B-A'],[...map.values()].map(r=>[r.code+' · '+r.name,String(r.a).replace('.',','),String(r.b).replace('.',','),String(r.b-r.a).replace('.',',')]))}};
+ if(page===3&&data){$('#compareApply').onclick=()=>{const a=$('#cmpAFrom').value,at=$('#cmpATo').value,b=$('#cmpBFrom').value,bt=$('#cmpBTo').value,d=$('#cmpDept').value;if(![a,at,b,bt].every(ZAI.validDate)||a>at||b>bt){msg('Informe períodos válidos para A e B.',true);return}try{ZAI.dateSpan(a,at);ZAI.dateSpan(b,bt);ZAI.monthRange(a,at);ZAI.monthRange(b,bt)}catch(e){msg(e.message,true);return}compareAFrom=a;compareATo=at;compareBFrom=b;compareBTo=bt;compareDept=d;msg('Comparação atualizada para os intervalos A e B.');render()};$('#compareCsv').onclick=()=>{const a=consolidatedDepartments(compareAFrom,compareATo,compareDept),b=consolidatedDepartments(compareBFrom,compareBTo,compareDept),map=new Map();for(const r of a)map.set(r.code,{code:r.code,name:r.name,a:r.consolidated,b:0});for(const r of b){if(!map.has(r.code))map.set(r.code,{code:r.code,name:r.name,a:0,b:0});map.get(r.code).b=r.consolidated}csv('comparacao_periodos_'+activeStore+'.csv',['Departamento','Consolidada A','Consolidada B','Variação B-A'],[...map.values()].map(r=>[r.code+' · '+r.name,String(r.a).replace('.',','),String(r.b).replace('.',','),String(r.b-r.a).replace('.',',')]))}};
  if(page===7){$('#localFile').onchange=async e=>{try{const f=e.target.files[0];if(!f)return;const d=JSON.parse(await f.text());setData(d,false);msg('Arquivo aberto para conferência. Nenhum dado foi enviado ao banco.')}catch(e){msg(e.message,true)}};$('#backup').onclick=()=>download('Base_Analitica_ZAI_'+activeStore+'_' +new Date().toISOString().slice(0,10)+'.json',JSON.stringify(data));$('#goalsCsv').onclick=()=>csv('metas_'+activeStore+'.csv',['Departamento','Participação %','Meta diaria R$','Meta perdas %'],(data.metas||[]).map(r=>[r.descricao,(r.participacao*100).toFixed(2).replace('.',','),ZAI.dailyGoal(data,r.codigo)==null?'':ZAI.dailyGoal(data,r.codigo).toFixed(2).replace('.',','),r.meta_perda==null?'':(r.meta_perda*100).toFixed(2).replace('.',',')]));$('#lossFile').onchange=e=>previewByType(e.target.files[0]);bindImportType();loadImportHistory();$('#importMode').onchange=()=>{pending=null;$('#lossFile').value='';$('#importPreview').innerHTML='Selecione novamente o arquivo para conferir este modo.'}}
 }
 

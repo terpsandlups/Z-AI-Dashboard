@@ -54,7 +54,7 @@ function bindLossGrid(){
  $('#lossReason').value=lossReason;$('#lossKind').value=lossKind;$('#lossStatus').value=lossStatus;renderLossGrid();
  $('#lossIndividual').onclick=()=>{lossMode='individual';lossSort='valor';lossPage=0;render()};$('#lossGrouped').onclick=()=>{lossMode='grouped';lossSort='valor';lossPage=0;render()};
  $('#lossSearch').oninput=e=>{lossQuery=e.target.value;lossPage=0;renderLossGrid()};$('#lossReason').onchange=e=>{lossReason=e.target.value;lossPage=0;renderLossGrid()};$('#lossKind').onchange=e=>{lossKind=e.target.value;lossPage=0;render()};$('#lossStatus').onchange=e=>{lossStatus=e.target.value;lossPage=0;renderLossGrid()};
- $('#lossExport').onclick=()=>{const rows=lossRows();csv('perdas_'+activeStore+'_'+lossMode+'.csv',lossMode==='individual'?['Loja','Data','SKU','Produto','Departamento','Motivo','Quantidade origem','Valor']:['Loja','SKU','Produto','Departamento','Ocorrências','Dias','Quantidade origem','Valor'],rows.map(r=>lossMode==='individual'?[activeStore,r.data,r.sku,r.produto,r.departamento,r.motivo,String(r.qtde).replace('.',','),r.valor.toFixed(2).replace('.',',')]:[activeStore,r.sku,r.produto,r.departamento,r.ocorrencias,r.dias,String(r.qtde).replace('.',','),r.valor.toFixed(2).replace('.',',')]))};
+ $('#lossExport').onclick=()=>{const rows=lossRows();csv('perdas_'+activeStore+'_'+$('#from').value+'_'+$('#to').value+'_'+lossMode+'.csv',lossMode==='individual'?['Loja','Data','SKU','Produto','Departamento','Motivo','Quantidade origem','Valor']:['Loja','SKU','Produto','Departamento','Ocorrências','Dias','Quantidade origem','Valor'],rows.map(r=>lossMode==='individual'?[activeStore,r.data,r.sku,r.produto,r.departamento,r.motivo,String(r.qtde).replace('.',','),r.valor.toFixed(2).replace('.',',')]:[activeStore,r.sku,r.produto,r.departamento,r.ocorrencias,r.dias,String(r.qtde).replace('.',','),r.valor.toFixed(2).replace('.',',')]))};
 }
 function auditRequestKey(){
  if(!data)return '';
@@ -147,8 +147,8 @@ async function loadAuditData(force=false){
   });
   if(page!==4||key!==auditRequestKey())return;
   auditData=r;auditLoadedKey=key;
- }catch(e){msg('Auditorias: '+e.message,true);auditData=null;auditLoadedKey='';}
- finally{auditLoading=false;if(page===4)render();}
+ }catch(e){if(key===auditRequestKey()){msg('Auditorias: '+e.message,true);auditData=null;auditLoadedKey='';}}
+ finally{if(page===4&&key===auditRequestKey()){auditLoading=false;render()}}
 }
 function renderAuditGridOnly(){
  if($('#auditGrid'))$('#auditGrid').innerHTML=auditGridHtml(auditData&&auditLoadedKey===auditRequestKey()?auditData:null);
@@ -160,12 +160,14 @@ function bindAuditPager(){
  if($('#auditNext'))$('#auditNext').onclick=()=>{auditPage++;if(auditMode==='individual'){auditData=null;auditLoadedKey=''}render()};
 }
 async function exportAuditCsv(){
+ const exportKey=auditRequestKey(),exportMode=auditMode,exportSort=auditSort;
  try{
   msg('Preparando CSV de auditorias…');
   const r=await request('/rest/v1/rpc/zai_auditorias_periodo',{
    p_loja:activeStore,p_de:$('#from').value,p_ate:$('#to').value,p_dpto:$('#dept').value||null,
    p_tipo:auditType||null,p_busca:auditQuery.trim()||null,p_modo:auditMode,p_limit:50000,p_offset:0
   }),rows=[...(r.linhas||[])];
+  if(exportKey!==auditRequestKey()){msg('O filtro mudou durante a exportação. Gere o CSV novamente com o período atual.',true);return;}
   rows.sort((a,b)=>{
    const net=x=>auditMode==='individual'?(x.tipo==='saida'?1:-1)*Number(x.valor||0):Number(x.liquido||0);
    if(auditSort==='faltas_sobras'){
@@ -185,11 +187,11 @@ async function exportAuditCsv(){
    return Number(b.movimentado??b.valor??0)-Number(a.movimentado??a.valor??0);
   });
   if(auditMode==='individual'){
-   csv('auditorias_'+activeStore+'_individual.csv',
+   csv('auditorias_'+activeStore+'_'+$('#from').value+'_'+$('#to').value+'_individual.csv',
     ['Loja','Data','Tipo','SKU','Produto','Departamento','Quantidade','Valor','Impacto líquido','Documento','Observação'],
     rows.map(x=>[activeStore,x.data,x.tipo==='saida'?'Falta':'Sobra',x.sku,x.produto,x.departamento,String(x.quantidade??0).replace('.',','),Number(x.valor||0).toFixed(2).replace('.',','),(x.tipo==='saida'?Number(x.valor||0):-Number(x.valor||0)).toFixed(2).replace('.',','),x.documento||'',x.observacao||'']));
   }else{
-   csv('auditorias_'+activeStore+'_agrupado.csv',
+   csv('auditorias_'+activeStore+'_'+$('#from').value+'_'+$('#to').value+'_agrupado.csv',
     ['Loja','SKU','Produto','Departamento','Ocorrências','Dias','Qtde falta','Qtde sobra','Faltas (R$)','Sobras (R$)','Resultado líquido (R$)'],
     rows.map(x=>[activeStore,x.sku,x.produto,x.departamento,x.ocorrencias,x.dias,String(x.qtde_falta??0).replace('.',','),String(x.qtde_sobra??0).replace('.',','),Number(x.faltas||0).toFixed(2).replace('.',','),Number(x.sobras||0).toFixed(2).replace('.',','),Number(x.liquido||0).toFixed(2).replace('.',',')]));
   }

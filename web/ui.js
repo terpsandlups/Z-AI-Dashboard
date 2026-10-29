@@ -1,6 +1,6 @@
 /* Shared shell and operational components. Data/metrics remain in app.js/core.js. */
 let lossMode='individual',lossQuery='',lossReason='',lossStatus='',lossKind='',lossPage=0,lossSort='valor',lossDirection=-1;
-let auditMode='agrupado',auditType='',auditQuery='',auditSort='faltas_sobras',auditSortDirection=-1,auditPage=0,auditData=null,auditLoadedKey='',auditLoading=false,auditSearchTimer=null;
+let auditMode='agrupado',auditType='',auditQuery='',auditSort='faltas_sobras',auditSortDirection=-1,auditPage=0,auditData=null,auditLoadedKey='',auditErrorKey='',auditLoading=false,auditSearchTimer=null;
 function syncStores(){
  const stores=cloud?accessibleStores:(data?[{codigo:data.loja,nome:data.nome}]:[]);
  $('#storeSelect').innerHTML=stores.length?stores.map(s=>`<option value="${esc(s.codigo)}">${esc(s.codigo+' · '+s.nome)}</option>`).join(''):'<option value="">Selecione a loja</option>';
@@ -139,6 +139,7 @@ async function loadAuditData(force=false){
  const key=auditRequestKey();
  if(!cloud){auditData=auditFallback();auditLoadedKey=key;auditLoading=false;renderAuditGridOnly();return}
  if(!force&&auditLoadedKey===key&&auditData){renderAuditGridOnly();return}
+ if(!force&&auditErrorKey===key)return;
  auditLoading=true;renderAuditGridOnly();
  try{
   const r=await request('/rest/v1/rpc/zai_auditorias_periodo',{
@@ -146,8 +147,8 @@ async function loadAuditData(force=false){
    p_tipo:auditType||null,p_busca:auditQuery.trim()||null,p_modo:auditMode,p_limit:auditMode==='agrupado'?50000:50,p_offset:auditMode==='agrupado'?0:auditPage*50
   });
   if(page!==4||key!==auditRequestKey())return;
-  auditData=r;auditLoadedKey=key;
- }catch(e){if(key===auditRequestKey()){msg('Auditorias: '+e.message,true);auditData=null;auditLoadedKey='';}}
+  auditData=r;auditLoadedKey=key;auditErrorKey='';
+ }catch(e){if(key===auditRequestKey()){msg('Auditorias: '+e.message,true);auditData=null;auditLoadedKey='';auditErrorKey=key;}}
  finally{if(page===4&&key===auditRequestKey()){auditLoading=false;render()}}
 }
 function renderAuditGridOnly(){
@@ -167,7 +168,8 @@ async function exportAuditCsv(){
    p_loja:activeStore,p_de:$('#from').value,p_ate:$('#to').value,p_dpto:$('#dept').value||null,
    p_tipo:auditType||null,p_busca:auditQuery.trim()||null,p_modo:auditMode,p_limit:50000,p_offset:0
   }),rows=[...(r.linhas||[])];
-  if(exportKey!==auditRequestKey()){msg('O filtro mudou durante a exportação. Gere o CSV novamente com o período atual.',true);return;}
+  if(exportKey!==auditRequestKey()||exportMode!==auditMode||exportSort!==auditSort){msg('O filtro ou a ordenação mudou durante a exportação. Gere o CSV novamente.',true);return;}
+  if(Number(r.total_linhas||0)>rows.length){msg('A consulta contém mais de '+num(rows.length)+' registros; refine o período, departamento ou busca para exportar sem truncamento.',true);return;}
   rows.sort((a,b)=>{
    const net=x=>auditMode==='individual'?(x.tipo==='saida'?1:-1)*Number(x.valor||0):Number(x.liquido||0);
    if(auditSort==='faltas_sobras'){

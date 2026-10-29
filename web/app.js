@@ -123,9 +123,9 @@ function applyOfficialGoals(snapshot){
  return {...snapshot,metas,meta_origem:'Planilhas de 16/10/2026',metas_participacao_soma:1.001};
 }
 function departmentOptions(snapshot){
- const official=new Set((snapshot.metas||[]).filter(r=>r.meta_perda!=null||r.meta_participacao!=null).map(r=>r.codigo));
- const allowed=official.size?Object.entries(snapshot.departamentos).filter(([k])=>official.has(k)):Object.entries(snapshot.departamentos);
- return (allowed.length?allowed:Object.entries(snapshot.departamentos)).sort((a,b)=>a[1].localeCompare(b[1],'pt-BR'));
+ // All registered departments must be selectable, including those without targets.
+ // Meta availability affects a KPI, never the visibility of a department in a filter.
+ return Object.entries(snapshot.departamentos||{}).sort((a,b)=>a[1].localeCompare(b[1],'pt-BR'));
 }
 const BASE=window.ZAI_CONFIG?.supabaseUrl||'',KEY=window.ZAI_CONFIG?.publishableKey||'';
 let activeStore='',accessibleStores=[],requestVersion=0;
@@ -214,9 +214,10 @@ function consolidatedDepartments(from,to,dept=''){
 }
 function shiftDate(d,delta){const x=new Date(d+'T12:00:00Z');x.setUTCDate(x.getUTCDate()+delta);return x.toISOString().slice(0,10)}
 function initComparePeriods(){
- const key=[activeStore,appliedFilters?.from,appliedFilters?.to].join('|');
+ const key=[activeStore,appliedFilters?.from,appliedFilters?.to,appliedFilters?.dept].join('|');
  if(compareScopeKey===key&&compareBFrom&&compareBTo&&compareAFrom&&compareATo)return;
  compareScopeKey=key;
+ compareDept=appliedFilters?.dept||'';
  compareBFrom=appliedFilters?.from||$('#from').value;compareBTo=appliedFilters?.to||$('#to').value;
  const len=ZAI.dateSpan(compareBFrom,compareBTo).length||1;
  compareATo=shiftDate(compareBFrom,-1);compareAFrom=shiftDate(compareATo,-len+1);
@@ -405,12 +406,13 @@ function renderProducts(){
 }
 function compare(){
  initComparePeriods();
- const dept=compareDept,a=operationalPeriod(compareAFrom,compareATo,dept),b=operationalPeriod(compareBFrom,compareBTo,dept),delta=b.consolidated-a.consolidated,deltaPct=a.consolidated!==0?delta/Math.abs(a.consolidated):null;
+ const dept=compareDept,a=operationalPeriod(compareAFrom,compareATo,dept),b=operationalPeriod(compareBFrom,compareBTo,dept),delta=b.consolidated-a.consolidated,deltaPct=a.consolidated>0?delta/a.consolidated:null,daysA=ZAI.dateSpan(compareAFrom,compareATo).length,daysB=ZAI.dateSpan(compareBFrom,compareBTo).length;
  const ad=consolidatedDepartments(compareAFrom,compareATo,dept),bd=consolidatedDepartments(compareBFrom,compareBTo,dept),map=new Map();
  for(const r of ad)map.set(r.code,{code:r.code,name:r.name,a:r.consolidated,b:0});for(const r of bd){if(!map.has(r.code))map.set(r.code,{code:r.code,name:r.name,a:0,b:0});map.get(r.code).b=r.consolidated}
  const rows=[...map.values()].map(r=>({...r,delta:r.b-r.a})).sort((x,y)=>Math.abs(y.delta)-Math.abs(x.delta));
  const opts='<option value="">Todos os departamentos</option>'+departmentOptions(data).map(([k,v])=>`<option value="${esc(k)}" ${k===compareDept?'selected':''}>${esc(k+' · '+v)}</option>`).join('');
  return `<article class="card compare-filter"><div class="section-title compact"><div><span class="section-kicker">ANÁLISE TEMPORAL</span><h2>Comparador de períodos</h2></div></div><p class="desc">Compare qualquer intervalo de datas. A fórmula é a mesma: reconhecidas + faltas − sobras.</p><div class="compare-controls"><label>Período A · de<input id="cmpAFrom" type="date" value="${esc(compareAFrom)}"></label><label>Período A · até<input id="cmpATo" type="date" value="${esc(compareATo)}"></label><span class="compare-vs">VS</span><label>Período B · de<input id="cmpBFrom" type="date" value="${esc(compareBFrom)}"></label><label>Período B · até<input id="cmpBTo" type="date" value="${esc(compareBTo)}"></label><label>Departamento<select id="cmpDept">${opts}</select></label><button class="primary" id="compareApply">Comparar</button></div></article>
+ ${daysA!==daysB?'<div class="notice">Períodos com durações diferentes ('+num(daysA)+' dias em A e '+num(daysB)+' dias em B). Compare totais absolutos com cautela.</div>':''}${(!a.context.comparable||!b.context.comparable)?'<div class="notice">Nem todas as fontes têm cobertura comparável nos dois intervalos. A variação monetária é descritiva; percentuais sobre vendas ficam indisponíveis quando não há cobertura.</div>':''}
  <div class="kpis">${card('Perdas consolidadas · A',money(a.consolidated),compareAFrom+' a '+compareATo)}${card('Perdas consolidadas · B',money(b.consolidated),compareBFrom+' a '+compareBTo,true)}${card('Variação em R$',money(delta),'B − A')}${card('Variação %',pct(deltaPct),'Sobre o período A')}</div>
  <div class="grid2"><article class="card"><h2>Período A</h2>${table(['Indicador','Valor'],[['Vendas',money(a.context.salesTotal)],['Reconhecidas',money(a.recon)],['Faltas',money(a.a.faltas)],['Sobras','− '+money(a.a.sobras)],['Consolidadas',money(a.consolidated)],['% / vendas',pct(a.ratio)]])}</article><article class="card"><h2>Período B</h2>${table(['Indicador','Valor'],[['Vendas',money(b.context.salesTotal)],['Reconhecidas',money(b.recon)],['Faltas',money(b.a.faltas)],['Sobras','− '+money(b.a.sobras)],['Consolidadas',money(b.consolidated)],['% / vendas',pct(b.ratio)]])}</article></div>
  <article class="card"><div class="section-title compact"><div><span class="section-kicker">TIPOS DE QUEBRAS</span><h2>Comparação de vencidos, avariados e deteriorados</h2></div></div>${kindChart(lossKindTotals(compareAFrom,compareATo,dept),lossKindTotals(compareBFrom,compareBTo,dept))}</article>
@@ -637,7 +639,7 @@ function render(){
  if(page===9&&data)recBind();
  if(page===2&&data){$('#productStatus').value=productStatus;renderProducts();loadSalesProducts();$('#productSearch').oninput=e=>{productQuery=e.target.value;productPage=0;renderProducts()};$('#productStatus').onchange=e=>{productStatus=e.target.value;productPage=0;renderProducts()};$('#salesCsv').onclick=()=>csv('vendas_produtos_'+activeStore+'_'+context.start+'_'+context.end+'.csv',['Loja','SKU','Produto','Departamento','Quantidade origem','Vendas'],products().map(x=>[activeStore,x.sku,x.produto,x.dept,String(x.qty).replace('.',','),x.value.toFixed(2).replace('.',',')]))}
  if(page===6&&data){bindTradePage();tradeTasksBind();}
- if(page===3&&data){$('#compareApply').onclick=()=>{const a=$('#cmpAFrom').value,at=$('#cmpATo').value,b=$('#cmpBFrom').value,bt=$('#cmpBTo').value,d=$('#cmpDept').value;if(![a,at,b,bt].every(ZAI.validDate)||a>at||b>bt){msg('Informe períodos válidos para A e B.',true);return}try{ZAI.dateSpan(a,at);ZAI.dateSpan(b,bt);ZAI.monthRange(a,at);ZAI.monthRange(b,bt)}catch(e){msg(e.message,true);return}compareAFrom=a;compareATo=at;compareBFrom=b;compareBTo=bt;compareDept=d;msg('Comparação atualizada para os intervalos A e B.');render()};$('#compareCsv').onclick=()=>{const a=consolidatedDepartments(compareAFrom,compareATo,compareDept),b=consolidatedDepartments(compareBFrom,compareBTo,compareDept),map=new Map();for(const r of a)map.set(r.code,{code:r.code,name:r.name,a:r.consolidated,b:0});for(const r of b){if(!map.has(r.code))map.set(r.code,{code:r.code,name:r.name,a:0,b:0});map.get(r.code).b=r.consolidated}csv('comparacao_periodos_'+activeStore+'.csv',['Departamento','Consolidada A','Consolidada B','Variação B-A'],[...map.values()].map(r=>[r.code+' · '+r.name,String(r.a).replace('.',','),String(r.b).replace('.',','),String(r.b-r.a).replace('.',',')]))}};
+ if(page===3&&data){$('#compareApply').onclick=()=>{const a=$('#cmpAFrom').value,at=$('#cmpATo').value,b=$('#cmpBFrom').value,bt=$('#cmpBTo').value,d=$('#cmpDept').value;if(![a,at,b,bt].every(ZAI.validDate)||a>at||b>bt){msg('Informe períodos válidos para A e B.',true);return}try{ZAI.dateSpan(a,at);ZAI.dateSpan(b,bt);ZAI.monthRange(a,at);ZAI.monthRange(b,bt)}catch(e){msg(e.message,true);return}compareAFrom=a;compareATo=at;compareBFrom=b;compareBTo=bt;compareDept=d;msg('Comparação atualizada para os intervalos A e B.');render()};$('#compareCsv').onclick=()=>{const a=consolidatedDepartments(compareAFrom,compareATo,compareDept),b=consolidatedDepartments(compareBFrom,compareBTo,compareDept),map=new Map();for(const r of a)map.set(r.code,{code:r.code,name:r.name,a:r.consolidated,b:0});for(const r of b){if(!map.has(r.code))map.set(r.code,{code:r.code,name:r.name,a:0,b:0});map.get(r.code).b=r.consolidated}csv('comparacao_periodos_'+activeStore+'_'+compareAFrom+'_'+compareATo+'_vs_'+compareBFrom+'_'+compareBTo+'.csv',['Departamento','Consolidada A','Consolidada B','Variação B-A'],[...map.values()].map(r=>[r.code+' · '+r.name,String(r.a).replace('.',','),String(r.b).replace('.',','),String(r.b-r.a).replace('.',',')]))}};
  if(page===7){$('#localFile').onchange=async e=>{try{const f=e.target.files[0];if(!f)return;const d=JSON.parse(await f.text());setData(d,false);msg('Arquivo aberto para conferência. Nenhum dado foi enviado ao banco.')}catch(e){msg(e.message,true)}};$('#backup').onclick=()=>download('Base_Analitica_ZAI_'+activeStore+'_' +new Date().toISOString().slice(0,10)+'.json',JSON.stringify(data));$('#goalsCsv').onclick=()=>csv('metas_'+activeStore+'.csv',['Departamento','Participação %','Meta diaria R$','Meta perdas %'],(data.metas||[]).map(r=>[r.descricao,(r.participacao*100).toFixed(2).replace('.',','),ZAI.dailyGoal(data,r.codigo)==null?'':ZAI.dailyGoal(data,r.codigo).toFixed(2).replace('.',','),r.meta_perda==null?'':(r.meta_perda*100).toFixed(2).replace('.',',')]));$('#lossFile').onchange=e=>previewByType(e.target.files[0]);bindImportType();loadImportHistory();$('#importMode').onchange=()=>{pending=null;$('#lossFile').value='';$('#importPreview').innerHTML='Selecione novamente o arquivo para conferir este modo.'}}
 }
 

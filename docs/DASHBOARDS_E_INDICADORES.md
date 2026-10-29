@@ -96,7 +96,7 @@ Não confundir **perda registrada** com **falta inventariada**. São eventos ope
 
 ### Cobertura das vendas
 
-A base aceita histórico diário e competências mensais. O motor de cálculo prioriza a cobertura diária quando ela está completa e **não soma o mesmo faturamento mensal e diário duas vezes**.
+A base aceita histórico diário e competências mensais. O motor de cálculo prioriza a cobertura diária quando ela está completa e **não soma o mesmo faturamento mensal e diário duas vezes**. O detalhe por SKU dos meses históricos fechados está disponível por consulta ao resumo mensal existente, sem criar movimentos diários fictícios.
 
 Médias por dia da semana devem respeitar dias cobertos, inclusive dias válidos com venda zero. Se o período de vendas está incompleto, o percentual de perdas não deve aparentar precisão que a base não possui.
 

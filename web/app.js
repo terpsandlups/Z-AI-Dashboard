@@ -156,6 +156,7 @@ function setData(d,isCloud){
  const chosen=prev&&ZAI.validDate(prev.from)&&ZAI.validDate(prev.to)&&prev.from<=prev.to?prev:null;
  if(chosen){$('#from').value=chosen.from;$('#to').value=chosen.to;$('#dept').value=chosen.dept&&data.departamentos[chosen.dept]?chosen.dept:'';}
  else if(latest){$('#from').value=latest.slice(0,7)+'-01';$('#to').value=latest;$('#dept').value='';}
+ else{const today=new Date(),y=today.getFullYear(),m=String(today.getMonth()+1).padStart(2,'0'),dd=String(today.getDate()).padStart(2,'0');$('#from').value=y+'-'+m+'-01';$('#to').value=y+'-'+m+'-'+dd;$('#dept').value='';}
  appliedFilters={from:$('#from').value,to:$('#to').value,dept:$('#dept').value};
  render();
 }

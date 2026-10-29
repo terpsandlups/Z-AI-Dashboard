@@ -141,8 +141,8 @@ async function p360Load(){
  if(!cloud||!session||page!==8||!p360Sku)return;
  const from=$('#from')?.value||'',to=$('#to')?.value||'',dept=$('#dept')?.value||'';
  const key=[activeStore,p360Sku,from,to,dept,data?.revision].join('|');
- if(ZAI.dateSpan(from,to).length>366){p360Error='Produto 360° aceita até 366 dias por consulta. Reduza o intervalo e aplique o filtro.';p360Result=null;p360CacheKey=key;render();return;}
  if(key===p360CacheKey&&(p360Result||p360Error))return;
+ if(ZAI.dateSpan(from,to).length>366){p360Error='Produto 360° aceita até 366 dias por consulta. Reduza o intervalo e aplique o filtro.';p360Result=null;p360CacheKey=key;render();return;}
  if(key===p360PendingKey)return;
  const token=++p360RequestId;
  p360PendingKey=key;p360Loading=true;p360Error='';p360Result=null;

@@ -129,7 +129,7 @@ function departmentOptions(snapshot){
 }
 const BASE=window.ZAI_CONFIG?.supabaseUrl||'',KEY=window.ZAI_CONFIG?.publishableKey||'';
 let activeStore='',accessibleStores=[],requestVersion=0;
-let data=null,page=0,cloud=false,session=null,context=null,pending=null,appliedFilters=null,compareScopeKey='',salesProductToken=0,salesProductError='',productPage=0,productQuery='',activeDept='',productStatus='',compareAFrom='',compareATo='',compareBFrom='',compareBTo='',compareDept='',salesProductRows=[],salesProductKey='',salesProductLoading=false,tradeSupplier='',tradeCategory='',tradeBrand='',tradeQuery='',consolidatedKind='';
+let data=null,page=0,cloud=false,session=null,context=null,pending=null,appliedFilters=null,compareScopeKey='',salesProductToken=0,salesProductError='',productPage=0,productQuery='',activeDept='',productStatus='',compareAFrom='',compareATo='',compareBFrom='',compareBTo='',compareDept='',salesProductRows=[],salesProductInfo=null,salesProductKey='',salesProductLoading=false,salesExportBusy=false,salesSearchTimer=null,tradeSupplier='',tradeCategory='',tradeBrand='',tradeQuery='',consolidatedKind='';
 function msg(s,error=false){$('#message').innerHTML=s?`<div class="notice ${error?'error':'info'}">${esc(s)}</div>`:''}
 function download(filename,text,type='application/json'){const u=URL.createObjectURL(new Blob([text],{type})),a=document.createElement('a');a.href=u;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(u),3000)}
 function csv(name,headers,rows){const cell=v=>'"'+String(v??'').replace(/^[=+@-]/,"'").replace(/"/g,'""')+'"';download(name,'\ufeff'+[headers,...rows].map(r=>r.map(cell).join(';')).join('\r\n'),'text/csv;charset=utf-8')}
@@ -143,7 +143,7 @@ function setData(d,isCloud){
  if(d.schema!=='zai-007-v2'||!/^\d{3}$/.test(d.loja)||!Array.isArray(d.perdas)||!d.departamentos||!d.produtos)throw Error('Base analítica incompatível.');
  if(![d.perdas,d.vendas_mensais||[],d.vendas_diarias||[]].every(a=>a.every(r=>Array.isArray(r)&&r.every(x=>typeof x==='string'||typeof x==='number'))))throw Error('Linhas inválidas na base.');
  const sameStore=activeStore===d.loja;
- data=applyOfficialGoals(d);cloud=isCloud;pending=null;activeStore=d.loja;salesProductRows=[];salesProductKey='';salesProductError='';salesProductToken++;
+ data=applyOfficialGoals(d);cloud=isCloud;pending=null;activeStore=d.loja;salesProductRows=[];salesProductInfo=null;salesProductKey='';salesProductError='';salesProductToken++;
  if(!sameStore){tradeSupplier='';tradeCategory='';tradeBrand='';tradeQuery='';}
  auditData=null;auditLoadedKey='';auditErrorKey='';auditPage=0;
  recResult=null;recKey='';recError='';recPending='';p360Result=null;p360CacheKey='';p360Error='';p360RequestId++;tradeTaskLoaded='';
@@ -173,7 +173,7 @@ function commitGlobalFilters(){
  appliedFilters={from,to,dept};
  updateFilterPending();
  if(changed){productPage=0;lossPage=0;auditPage=0;auditData=null;auditLoadedKey='';auditErrorKey='';
-  salesProductRows=[];salesProductKey='';salesProductError='';salesProductToken++;
+  salesProductRows=[];salesProductInfo=null;salesProductKey='';salesProductError='';salesProductToken++;
   recResult=null;recKey='';recError='';recPending='';
   p360Result=null;p360CacheKey='';p360Error='';p360RequestId++;}
  msg('Filtro aplicado: '+from.split('-').reverse().join('/')+' a '+to.split('-').reverse().join('/')+(dept?' · Departamento '+dept:''));
@@ -383,39 +383,113 @@ function sales(){const c=context,hasMonthly=c.sources.some(x=>x.endsWith(': mens
  return `<div class="kpis">${card('Faturamento',c.sales.length?money(c.salesTotal):'—','Receita no período selecionado',true)}${card('Meta de vendas',money(c.goal),num(c.days)+' dias no intervalo selecionado')}${card('Média diária',c.salesDays.size?money(c.salesTotal/c.salesDays.size):'—',num(c.salesDays.size)+' dias de vendas cobertos')}${card('Departamentos com venda',num(r.filter(x=>x.sales>0).length),'No filtro atual')}</div>
  <div class="grid2"><article class="card"><h2>Vendas por departamento</h2><p class="desc">Top 10 por faturamento no intervalo exato.</p>${bars(r.filter(x=>x.sales>0).slice(0,10).map(x=>[x.name,x.sales]))}</article><article class="card"><h2>Média por dia da semana</h2><p class="desc">Base diária do período selecionado.</p>${!hasMonthly&&w.some(x=>x.days)?bars(w.map((x,i)=>[['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'][i]+' · '+x.days+' dias',x.mean||0,money(x.mean)])):'<div class="notice">'+(hasMonthly?'Média semanal indisponível: existe faturamento mensal sem detalhamento de todos os dias.':'Sem cobertura diária suficiente para este intervalo.')+'</div>'}</article></div>${departmentFocus(r)}<article class="card"><h2>Participação por departamento</h2><p class="desc">Venda do departamento ÷ faturamento total da loja no mesmo período.</p>${table(['Departamento','Vendas','Meta participação','Participação real','Desvio p.p.'],r.map(x=>{const goal=(data.metas||[]).find(g=>g.codigo===x.code)?.meta_participacao??null;return [esc(x.code+' · '+x.name),money(x.sales),pct(goal),pct(x.salesShare),goal==null||x.salesShare==null?'—':pp(x.salesShare-goal)]}))}</article>${targets()}
  <article class="card"><div class="section-title compact"><div><span class="section-kicker">DIA A DIA</span><h2>Meta diária × realizado</h2></div></div><p class="desc">A meta diária da loja é distribuída pelo percentual oficial do departamento quando houver filtro setorial.</p>${dailySalesGoalChart()}</article>
-  <div class="section-title"><h2>Departamento → Produto</h2><button id="salesCsv">Exportar produtos CSV</button></div><article class="card"><div class="searchrow"><input id="productSearch" placeholder="Buscar SKU ou produto" value="${esc(productQuery)}"><select id="productStatus"><option value="">Todos os status</option><option>Ativo</option><option>Inativo</option><option>Nao informado</option></select></div><div id="products"></div></article>`;
+  <div class="section-title sales-explorer-title"><div><span class="section-kicker">DETALHAMENTO COMERCIAL</span><h2>Departamento → Produto</h2><p class="desc">Pesquise qualquer SKU do histórico, com totais conciliados ao período.</p></div><button id="salesCsv" type="button">Exportar CSV completo</button></div><article class="card"><div class="searchrow"><input id="productSearch" placeholder="Buscar SKU ou produto" value="${esc(productQuery)}"><select id="productStatus"><option value="">Todos os status</option><option>Ativo</option><option>Inativo</option><option>Nao informado</option></select></div><div id="products"></div></article>`;
 }
 function products(){
- const q=productQuery.toLocaleLowerCase('pt-BR');
- return salesProductRows.filter(x=>(!productStatus||x.status===productStatus)&&(!q||(x.sku+' '+x.produto).toLocaleLowerCase('pt-BR').includes(q))).sort((a,b)=>b.value-a.value);
+ return salesProductRows;
 }
-async function loadSalesProducts(){
- if(!data||page!==2)return;
- const key=[activeStore,context.start,context.end,$('#dept').value,data.revision].join('|');
- if(key===salesProductKey){renderProducts();return}
+function salesScopeKey(){
+ return [activeStore,context?.start,context?.end,$('#dept').value,data?.revision,
+   productQuery.trim(),productStatus,productPage].join('|');
+}
+async function loadSalesProducts(force=false){
+ if(!data||page!==2||!context)return;
+ const key=salesScopeKey();
+ if(!force&&key===salesProductKey){renderProducts();return}
  const token=++salesProductToken;
- salesProductKey=key;salesProductRows=[];salesProductError='';salesProductLoading=true;renderProducts();
+ salesProductKey=key;salesProductRows=[];salesProductInfo=null;salesProductError='';
+ salesProductLoading=true;renderProducts();
  try{
-  if(cloud){
-   const rows=await request('/rest/v1/rpc/zai_vendas_produtos_periodo',{p_loja:activeStore,p_de:context.start,p_ate:context.end,p_dpto:$('#dept').value||null});
-   if(token!==salesProductToken||key!==[activeStore,$('#from').value,$('#to').value,$('#dept').value,data?.revision].join('|'))return;
-   salesProductRows=(rows||[]).map(r=>({sku:String(r.sku),produto:r.produto||String(r.sku),dept:r.dpto,qty:Number(r.quantidade||0),value:Number(r.valor||0),status:r.situacao||'Nao informado'}));
-  }else salesProductRows=[];
- }catch(e){if(token===salesProductToken){salesProductError=e.message||'Falha ao consultar produtos';msg('Detalhe por produto: '+salesProductError,true)}}
- finally{if(token===salesProductToken){salesProductLoading=false;if(page===2)renderProducts()}}
+  if(!cloud){salesProductError='Conecte uma conta autorizada do Supabase para consultar o histórico por produto.';return}
+  const result=await request('/rest/v1/rpc/zai_vendas_produtos_pagina',{
+   p_loja:activeStore,p_de:context.start,p_ate:context.end,
+   p_dpto:$('#dept').value||null,p_busca:productQuery.trim(),
+   p_situacao:productStatus,p_pagina:productPage,p_tamanho:40
+  });
+  if(token!==salesProductToken||key!==salesScopeKey())return;
+  if(!result||!Array.isArray(result.linhas))throw Error('Formato de resposta de produtos inesperado.');
+  salesProductRows=result.linhas.map(r=>({
+    sku:String(r.sku),produto:r.produto||String(r.sku),dept:r.dpto,
+    qty:Number(r.quantidade||0),value:Number(r.valor||0),status:r.situacao||'Nao informado'
+  }));
+  salesProductInfo=result;
+ }catch(e){
+  if(token===salesProductToken){salesProductError=e.message||'Não foi possível consultar produtos.';}
+ }finally{
+  if(token===salesProductToken){salesProductLoading=false;if(page===2)renderProducts()}
+ }
 }
 function renderProducts(){
- if(!$('#products'))return;
- if(salesProductLoading){$('#products').innerHTML='<div class="loading-state">Carregando produtos do período…</div>';return}
- if(salesProductError){$('#products').innerHTML='<div class="notice error">Não foi possível carregar o detalhe de produtos: '+esc(salesProductError)+'</div>';return}
- const list=products(),size=40,max=Math.max(1,Math.ceil(list.length/size));productPage=Math.min(productPage,max-1);
- const legacyMonths=context.months.filter(m=>(data?.vendas_mensais||[]).some(row=>row[0]===m));
- const sourceNote=legacyMonths.length?'<div class="notice">Vendas históricas por SKU recuperadas da base mensal para competências completas ('+esc(legacyMonths.join(', '))+'). Cada produto representa o total do mês; o histórico não fornece vendas diárias por SKU para essas competências.</div>':'';
- const sourceMismatch=!productQuery&&!productStatus&&salesProductRows.length&&Math.abs(salesProductRows.reduce((t,x)=>t+x.value,0)-context.salesTotal)>0.05;
- const reconciliation=sourceMismatch?'<div class="notice error">A soma dos produtos não coincide com o faturamento exibido. Confira a cobertura do período antes de utilizar esta análise.</div>':'';
- $('#products').innerHTML=sourceNote+reconciliation+(list.length?table(['Produto / SKU','Departamento','Situação atual','Quantidade¹','Vendas'],list.slice(productPage*size,(productPage+1)*size).map(x=>['<button type="button" class="p360-link" data-open-360="'+esc(x.sku)+'" title="Abrir Produto 360°">'+esc(x.produto+' · '+x.sku)+' ↗</button>',esc(data.departamentos[x.dept]||x.dept),esc(x.status||'Nao informado'),num(x.qty),money(x.value)]))+`<div class="actions"><button id="prevProducts" ${productPage===0?'disabled':''}>Anterior</button><span class="small">Página ${productPage+1} / ${max} · ${num(list.length)} produtos/departamentos</span><button id="nextProducts" ${productPage>=max-1?'disabled':''}>Próxima</button></div><p class="small muted">¹ Quantidade na unidade de origem de cada SKU.</p>`:'<div class="empty-inline">Sem vendas por SKU disponíveis para este intervalo. Nos meses históricos, selecione o mês completo.</div>');
+ const el=$('#products');if(!el)return;
+ if(salesProductLoading){el.innerHTML='<div class="sales-browser-loading"><span class="sales-spinner" aria-hidden="true"></span><div><strong>Consultando vendas por produto…</strong><small>Buscando o período, departamento e filtros no banco. Nenhuma venda será duplicada.</small></div></div>';return}
+ if(salesProductError){
+  const partial=/m[eê]s completo|fechamento mensal|hist[oó]rico desse m[eê]s/i.test(salesProductError);
+  el.innerHTML='<div class="notice error" role="alert">'+esc(salesProductError)+'</div>'+
+    '<div class="actions"><button type="button" id="retrySalesProducts">↻ Tentar novamente</button>'+
+    (partial&&$('#from').value.slice(0,7)===$('#to').value.slice(0,7)?'<button type="button" id="salesFullMonth">Consultar mês completo</button>':'')+'</div>';
+  if($('#retrySalesProducts'))$('#retrySalesProducts').onclick=()=>loadSalesProducts(true);
+  if($('#salesFullMonth'))$('#salesFullMonth').onclick=()=>{
+   const m=$('#from').value.slice(0,7);$('#from').value=m+'-01';$('#to').value=ZAI.monthEnd(m);
+   if(commitGlobalFilters()){productPage=0;render();}
+  };
+  return;
+ }
+ if(!salesProductInfo){el.innerHTML='<div class="empty-inline">Selecione um período e aguarde a consulta.</div>';return}
+ const list=products(),size=40,found=Number(salesProductInfo.total_filtrado||0),
+  total=Number(salesProductInfo.total_geral||0),
+  max=Math.max(1,Math.ceil(found/size)),
+  legacyMonths=context.months.filter(m=>(data?.vendas_mensais||[]).some(r=>r[0]===m));
+ const sourceNote=legacyMonths.length?
+  '<div class="sales-source-note"><strong>Histórico mensal por SKU · '+esc(legacyMonths.join(', '))+'</strong><span>Estas competências têm totais por produto no mês. Há valores diários por departamento, mas sem movimentação diária por SKU confirmada para esses meses.</span></div>':
+  '<div class="sales-source-note daily"><strong>Detalhamento diário por SKU</strong><span>Produtos calculados pelas datas efetivamente registradas na base diária.</span></div>';
+ const difference=Number(salesProductInfo.valor_geral||0)-Number(context.salesTotal||0),
+  mismatch=Math.abs(difference)>0.05;
+ const summary='<div class="sales-product-summary">'+
+  '<div><span>Produtos no período</span><strong>'+num(total)+'</strong></div>'+
+  '<div><span>Produtos encontrados</span><strong>'+num(found)+'</strong></div>'+
+  '<div><span>Valor encontrado</span><strong>'+money(Number(salesProductInfo.valor_filtrado||0))+'</strong></div>'+
+  '</div>';
+ const reconcile=mismatch?'<div class="notice error">Conferência: o somatório por SKU '+money(Number(salesProductInfo.valor_geral||0))+
+  ' diverge em '+money(Math.abs(difference))+' do faturamento principal '+money(context.salesTotal)+
+  '. Antes de utilizar os totais, confira a cobertura e a origem do período.</div>':'';
+ const pagination='<nav class="sales-products-pager" aria-label="Navegação dos produtos">'+
+  '<button type="button" id="prevProducts" '+(productPage===0?'disabled':'')+'>← Anterior</button>'+
+  '<span>Página <b>'+num(productPage+1)+'</b> de <b>'+num(max)+'</b> · até '+num(size)+' linhas por página</span>'+
+  '<button type="button" id="nextProducts" '+(productPage>=max-1?'disabled':'')+'>Próxima →</button></nav>';
+ const tableRows=list.map(x=>[
+   '<button type="button" class="p360-link" data-open-360="'+esc(x.sku)+'" title="Abrir Produto 360°">'+esc(x.produto+' · '+x.sku)+' ↗</button>',
+   esc(data.departamentos[x.dept]||x.dept),esc(x.status||'Nao informado'),num(x.qty),money(x.value)
+ ]);
+ el.innerHTML=sourceNote+summary+reconcile+
+  (list.length?table(['Produto / SKU','Departamento','Situação atual','Quantidade¹','Vendas'],tableRows)+pagination:
+   '<div class="empty-inline">Nenhum SKU encontrado para essa pesquisa e período.</div>')+
+  '<p class="small muted">¹ Quantidade na unidade original do SKU. Busca, situação e paginação consultam o período no Supabase.</p>';
  document.querySelectorAll('[data-open-360]').forEach(b=>b.onclick=()=>p360SelectSku(b.dataset.open360));
- if($('#prevProducts'))$('#prevProducts').onclick=()=>{productPage--;renderProducts()};if($('#nextProducts'))$('#nextProducts').onclick=()=>{productPage++;renderProducts()}
+ if($('#prevProducts'))$('#prevProducts').onclick=()=>{if(productPage>0){productPage--;loadSalesProducts();}};
+ if($('#nextProducts'))$('#nextProducts').onclick=()=>{if(productPage+1<max){productPage++;loadSalesProducts();}};
+}
+async function exportSalesProducts(){
+ if(salesProductLoading||salesExportBusy){msg('Aguarde o término da consulta.',true);return}
+ if(!cloud||!data){msg('Conecte uma conta autorizada para exportar produtos.',true);return}
+ const key=[activeStore,context.start,context.end,$('#dept').value,data.revision,productQuery.trim(),productStatus].join('|');
+ salesExportBusy=true;const b=$('#salesCsv');if(b){b.disabled=true;b.textContent='Preparando CSV completo…'}
+ try{
+  const rows=await request('/rest/v1/rpc/zai_vendas_produtos_periodo',{
+   p_loja:activeStore,p_de:context.start,p_ate:context.end,p_dpto:$('#dept').value||null
+  });
+  if(key!==[activeStore,$('#from').value,$('#to').value,$('#dept').value,data?.revision,productQuery.trim(),productStatus].join('|')){
+   throw Error('O filtro foi alterado durante a exportação. Gere o arquivo novamente.');
+  }
+  const q=productQuery.trim().toLocaleLowerCase('pt-BR');
+  const filtered=(rows||[]).filter(x=>(!productStatus||String(x.situacao||'Nao informado')===productStatus)&&
+   (!q||(String(x.sku)+' '+String(x.produto||'')).toLocaleLowerCase('pt-BR').includes(q)));
+  csv('vendas_produtos_'+activeStore+'_'+context.start+'_'+context.end+'.csv',
+   ['Loja','SKU','Produto','Departamento','Situação','Quantidade origem','Vendas'],
+   filtered.map(x=>[activeStore,x.sku,x.produto,x.dpto,x.situacao||'Nao informado',
+     String(x.quantidade||0).replace('.',','),Number(x.valor||0).toFixed(2).replace('.',',')]));
+  msg('Exportação completa: '+num(filtered.length)+' linhas, no período selecionado.');
+ }catch(e){msg('Não foi possível exportar o histórico: '+e.message,true)}
+ finally{salesExportBusy=false;if($('#salesCsv')){$('#salesCsv').disabled=false;$('#salesCsv').textContent='Exportar CSV completo';}}
 }
 function compare(){
  initComparePeriods();
@@ -651,7 +725,7 @@ function render(){
  if(page===4&&data)bindAuditPage();
  if(page===8&&data)p360Bind();
  if(page===9&&data)recBind();
- if(page===2&&data){$('#productStatus').value=productStatus;renderProducts();loadSalesProducts();$('#productSearch').oninput=e=>{productQuery=e.target.value;productPage=0;renderProducts()};$('#productStatus').onchange=e=>{productStatus=e.target.value;productPage=0;renderProducts()};$('#salesCsv').onclick=()=>{if(salesProductLoading||salesProductError||!salesProductRows.length){msg('Aguarde o carregamento de produtos ou confira o período antes de exportar.',true);return;}csv('vendas_produtos_'+activeStore+'_'+context.start+'_'+context.end+'.csv',['Loja','SKU','Produto','Departamento','Quantidade origem','Vendas'],products().map(x=>[activeStore,x.sku,x.produto,x.dept,String(x.qty).replace('.',','),x.value.toFixed(2).replace('.',',')]))}}
+ if(page===2&&data){$('#productStatus').value=productStatus;renderProducts();void loadSalesProducts();$('#productSearch').oninput=e=>{productQuery=e.target.value;productPage=0;if(salesSearchTimer)clearTimeout(salesSearchTimer);salesSearchTimer=setTimeout(()=>{if(page===2)void loadSalesProducts()},320)};$('#productStatus').onchange=e=>{productStatus=e.target.value;productPage=0;void loadSalesProducts()};$('#salesCsv').onclick=exportSalesProducts}
  if(page===6&&data){bindTradePage();tradeTasksBind();}
  if(page===3&&data){$('#compareApply').onclick=()=>{const a=$('#cmpAFrom').value,at=$('#cmpATo').value,b=$('#cmpBFrom').value,bt=$('#cmpBTo').value,d=$('#cmpDept').value;if(![a,at,b,bt].every(ZAI.validDate)||a>at||b>bt){msg('Informe períodos válidos para A e B.',true);return}try{ZAI.dateSpan(a,at);ZAI.dateSpan(b,bt);ZAI.monthRange(a,at);ZAI.monthRange(b,bt)}catch(e){msg(e.message,true);return}compareAFrom=a;compareATo=at;compareBFrom=b;compareBTo=bt;compareDept=d;msg('Comparação atualizada para os intervalos A e B.');render()};$('#compareCsv').onclick=()=>{const a=consolidatedDepartments(compareAFrom,compareATo,compareDept),b=consolidatedDepartments(compareBFrom,compareBTo,compareDept),map=new Map();for(const r of a)map.set(r.code,{code:r.code,name:r.name,a:r.consolidated,b:0});for(const r of b){if(!map.has(r.code))map.set(r.code,{code:r.code,name:r.name,a:0,b:0});map.get(r.code).b=r.consolidated}csv('comparacao_periodos_'+activeStore+'_'+compareAFrom+'_'+compareATo+'_vs_'+compareBFrom+'_'+compareBTo+'.csv',['Departamento','Consolidada A','Consolidada B','Variação B-A'],[...map.values()].map(r=>[r.code+' · '+r.name,String(r.a).replace('.',','),String(r.b).replace('.',','),String(r.b-r.a).replace('.',',')]))}};
  if(page===7){$('#localFile').onchange=async e=>{try{const f=e.target.files[0];if(!f)return;const d=JSON.parse(await f.text());setData(d,false);msg('Arquivo aberto para conferência. Nenhum dado foi enviado ao banco.')}catch(e){msg(e.message,true)}};$('#backup').onclick=()=>download('Base_Analitica_ZAI_'+activeStore+'_' +new Date().toISOString().slice(0,10)+'.json',JSON.stringify(data));$('#goalsCsv').onclick=()=>csv('metas_'+activeStore+'.csv',['Departamento','Participação %','Meta diaria R$','Meta perdas %'],(data.metas||[]).map(r=>[r.descricao,(r.participacao*100).toFixed(2).replace('.',','),ZAI.dailyGoal(data,r.codigo)==null?'':ZAI.dailyGoal(data,r.codigo).toFixed(2).replace('.',','),r.meta_perda==null?'':(r.meta_perda*100).toFixed(2).replace('.',',')]));$('#lossFile').onchange=e=>previewByType(e.target.files[0]);bindImportType();loadImportHistory();$('#importMode').onchange=()=>{pending=null;$('#lossFile').value='';$('#importPreview').innerHTML='Selecione novamente o arquivo para conferir este modo.'}}

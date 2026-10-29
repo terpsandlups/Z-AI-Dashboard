@@ -145,7 +145,7 @@ function setData(d,isCloud){
  const sameStore=activeStore===d.loja;
  data=applyOfficialGoals(d);cloud=isCloud;pending=null;activeStore=d.loja;salesProductRows=[];salesProductKey='';salesProductError='';salesProductToken++;
  if(!sameStore){tradeSupplier='';tradeCategory='';tradeBrand='';tradeQuery='';}
- auditData=null;auditLoadedKey='';auditPage=0;
+ auditData=null;auditLoadedKey='';auditErrorKey='';auditPage=0;
  recResult=null;recKey='';recError='';recPending='';p360Result=null;p360CacheKey='';p360Error='';p360RequestId++;tradeTaskLoaded='';
  syncStores();
  $('#sourceBadge').textContent=isCloud?'Supabase · '+d.loja:'Conferência local · não salva na nuvem';$('#refresh').hidden=!isCloud;$('#logout').hidden=!session;$('#loginOpen').textContent=isCloud?'Conta conectada':'Conectar Supabase';
@@ -172,7 +172,7 @@ function commitGlobalFilters(){
  const old=appliedFilters,changed=!old||old.from!==from||old.to!==to||old.dept!==dept;
  appliedFilters={from,to,dept};
  updateFilterPending();
- if(changed){productPage=0;lossPage=0;auditPage=0;auditData=null;auditLoadedKey='';
+ if(changed){productPage=0;lossPage=0;auditPage=0;auditData=null;auditLoadedKey='';auditErrorKey='';
   salesProductRows=[];salesProductKey='';salesProductError='';salesProductToken++;
   recResult=null;recKey='';recError='';recPending='';
   p360Result=null;p360CacheKey='';p360Error='';p360RequestId++;}

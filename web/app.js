@@ -179,7 +179,12 @@ function commitGlobalFilters(){
  msg('Filtro aplicado: '+from.split('-').reverse().join('/')+' a '+to.split('-').reverse().join('/')+(dept?' · Departamento '+dept:''));
  return true;
 }
-function card(title,value,note,hero=false){return `<article class="card kpi ${hero?'hero':''}"><label>${esc(title)}</label><b>${value}</b><small>${note}</small></article>`}
+function card(title,value,note,hero=false){
+ // Somente apresentação: o tom indica a natureza do indicador, não seu resultado.
+ const label=String(title).toLocaleLowerCase('pt-BR');
+ const tone=/sobra|cr[eé]dito/.test(label)?'credit':/perda|quebra|falta|diverg[eê]ncia/.test(label)?'loss':/faturamento|venda|receita/.test(label)?'sales':/meta|objetivo/.test(label)?'target':'neutral';
+ return `<article class="card kpi ${hero?'hero':''}" data-tone="${tone}"><label>${esc(title)}</label><b>${value}</b><small>${note}</small></article>`;
+}
 function table(headers,rows){return `<div class="table-wrap"><table><thead><tr>${headers.map((h,i)=>`<th class="${i?'num':''}">${h}</th>`).join('')}</tr></thead><tbody>${rows.length?rows.map(row=>'<tr>'+row.map((x,i)=>`<td class="${i?'num':''}">${x}</td>`).join('')+'</tr>').join(''):`<tr><td colspan="${headers.length}">Sem registros para este filtro.</td></tr>`}</tbody></table></div>`}
 function bars(rows,red=false){const max=Math.max(...rows.map(x=>Math.abs(x[1])),1);return rows.length?`<div class="bars">${rows.map(([name,value,label])=>`<div><div class="bar-head"><span>${esc(name)}</span><strong>${label||money(value)}</strong></div><div class="bar-track"><div class="bar-fill ${red?'red':''}" style="width:${Math.max(0,value)/max*100}%"></div></div></div>`).join('')}</div>`:'<p class="small muted">Sem dados comparáveis no período.</p>'}
 function departmentAnalyticsContext(){

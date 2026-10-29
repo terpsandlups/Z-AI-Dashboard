@@ -160,6 +160,10 @@ function setData(d,isCloud){
  appliedFilters={from:$('#from').value,to:$('#to').value,dept:$('#dept').value};
  render();
 }
+function updateFilterPending(){
+ const f=appliedFilters,p=$('#filterPending');if(!p)return;
+ p.hidden=!data||!f||($('#from').value===f.from&&$('#to').value===f.to&&$('#dept').value===(f.dept||''));
+}
 function commitGlobalFilters(){
  const from=$('#from').value,to=$('#to').value,dept=$('#dept').value;
  if(!ZAI.validDate(from)||!ZAI.validDate(to)||from>to){msg('Período inválido: confira as datas inicial e final.',true);return false;}
@@ -167,6 +171,7 @@ function commitGlobalFilters(){
  if(dept&&!data?.departamentos?.[dept]){msg('Departamento inválido para a loja atual.',true);return false;}
  const old=appliedFilters,changed=!old||old.from!==from||old.to!==to||old.dept!==dept;
  appliedFilters={from,to,dept};
+ updateFilterPending();
  if(changed){productPage=0;lossPage=0;auditPage=0;auditData=null;auditLoadedKey='';
   salesProductRows=[];salesProductKey='';salesProductError='';salesProductToken++;
   recResult=null;recKey='';recError='';recPending='';
@@ -620,6 +625,7 @@ function exchange(){return `<div class="grid2"><article class="card"><h2>Central
 function empty(){return `<article class="card empty"><span class="number">Z</span><h2>Seu painel, conectado às suas lojas</h2><p>Entre na conta do Supabase para consultar os dados salvos. Para conferir esta versão antes da ativação, abra <b>data/base_conferida.json</b> no menu Importar e Exportar.</p><div class="actions" style="justify-content:center"><button class="primary" id="emptyLogin">Conectar Supabase</button><button id="emptyLocal">Abrir base de conferência</button></div></article>`;}
 function render(){
  if(data&&appliedFilters){$('#from').value=appliedFilters.from;$('#to').value=appliedFilters.to;$('#dept').value=appliedFilters.dept||'';}
+ updateFilterPending();
  $('#nav').innerHTML=names.map((n,i)=>`<button data-page="${i}" class="${page===i?'active':''}" title="${esc(n)}" aria-label="${esc(n)}" aria-current="${page===i?'page':'false'}"><span class="navicon" aria-hidden="true">${navIcons[i]}</span><span class="navlabel">${n}</span></button>`).join('');$('#nav').querySelectorAll('button').forEach(b=>b.onclick=()=>{page=+b.dataset.page;msg('');render()});
  $('#pageTitle').textContent=names[page];$('.subtitle').textContent=subtitles[page]||'Dashboard Executivo';$('#filters').hidden=!data||page===3||page===6||page===7;$('#coverage').innerHTML='';$('#stamp').textContent='Consultado em '+new Date().toLocaleString('pt-BR');
  if(data&&[0,1,2,4,5,8,9].includes(page)){let from=$('#from').value,to=$('#to').value;if(!from||!to||from>to){msg('Informe datas válidas, com início anterior ao fim.',true);return}context=ZAI.select(data,from,to,$('#dept').value);$('#periodNote').textContent=context.days+' dias no período · '+(context.sources.length?context.sources.join(' / '):'vendas não disponíveis');
@@ -879,3 +885,4 @@ function initPasswordRecovery(){
 $('#loginOpen').onclick=()=>{loginMode('login');$('#login').showModal()};$('#loginClose').onclick=()=>$('#login').close();$('#forgotPassword').onclick=sendPasswordRecovery;$('#saveNewPassword').onclick=saveRecoveredPassword;$('#cancelRecovery').onclick=()=>loginMode('login');$('#loginForm').onsubmit=async e=>{e.preventDefault();$('#loginError').textContent='Conectando…';try{const r=await request('/auth/v1/token?grant_type=password',{email:$('#email').value,password:$('#password').value},false);session={...r,expires_at:Date.now()/1000+r.expires_in};$('#password').value='';$('#loginError').textContent='';$('#login').close();await refresh();}catch(e){$('#loginError').textContent=e.message}};
 initPasswordRecovery();
 $('#logout').onclick=async()=>{if(session)fetch(BASE+'/auth/v1/logout',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+session.access_token}}).catch(()=>{});requestVersion++;session=null;data=null;cloud=false;context=null;pending=null;activeStore='';accessibleStores=[];syncStores();$('#logout').hidden=true;$('#refresh').hidden=true;$('#sourceBadge').textContent='Sessão encerrada';$('#loginOpen').textContent='Conectar Supabase';msg('');render()};$('#refresh').onclick=()=>refresh();$('#apply').onclick=()=>{if(!commitGlobalFilters())return;productPage=0;render()};
+['#from','#to','#dept'].forEach(id=>{$(id).addEventListener('input',updateFilterPending);$(id).addEventListener('change',updateFilterPending)});

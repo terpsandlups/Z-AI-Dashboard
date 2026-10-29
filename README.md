@@ -5,7 +5,7 @@
 
 **Transformando relatórios do ERP em indicadores confiáveis, investigação por produto e decisões de loja.**
 
-[🌐 Abrir dashboard na Vercel](https://z-ai-dashboard-preview.vercel.app/) · [📐 Arquitetura](docs/ARQUITETURA.md) · [🔄 ETL e importações](docs/ETL_E_IMPORTACOES.md) · [📊 Dashboards](docs/DASHBOARDS_E_INDICADORES.md) · [🗺️ Roadmap](docs/ROADMAP.md) · [🔎 Engenharia reversa](docs/REFERENCIAS_ENGENHARIA_REVERSA.md) · [✅ Auditoria de filtros](docs/AUDITORIA_FILTROS_2026-10.md) · [📦 Vendas históricas por SKU](docs/RECUPERACAO_VENDAS_HISTORICAS.md)
+[🌐 Abrir dashboard na Vercel](https://z-ai-dashboard-preview.vercel.app/) · [📐 Arquitetura](docs/ARQUITETURA.md) · [🔄 ETL e importações](docs/ETL_E_IMPORTACOES.md) · [📊 Dashboards](docs/DASHBOARDS_E_INDICADORES.md) · [🗺️ Roadmap](docs/ROADMAP.md) · [🔎 Engenharia reversa](docs/REFERENCIAS_ENGENHARIA_REVERSA.md) · [🎨 Engenharia reversa visual](docs/ENGENHARIA_REVERSA_VISUAL_2026_10.md) · [✅ Auditoria de filtros](docs/AUDITORIA_FILTROS_2026-10.md) · [📦 Vendas históricas por SKU](docs/RECUPERACAO_VENDAS_HISTORICAS.md)
 
 **Piloto:** Loja **007 — Kalimera Japy** · Grupo MONTEKALI  
 **Stack:** HTML · CSS · JavaScript · Python · PostgreSQL/Supabase · SQL/PLpgSQL · Vercel · GitHub
@@ -52,6 +52,8 @@ flowchart LR
 | **8. Central de Importações** | Seleção do tipo, leitura dos formatos do ERP, prévia, confirmação, histórico de lotes e reversão controlada de cargas elegíveis |
 | **9. Produto 360°** | Pesquisa por SKU/descrição, venda, perda reconhecida, faltas, sobras, histórico e rastreabilidade por lote |
 | **10. Inteligência de Recorrência** | Analisa SKUs com perdas em dias distintos, valor acumulado, frequência e maior ocorrência |
+
+**Identidade visual executiva (outubro/2026):** camada de design dedicada em `web/visual-polish.css`, com refinamento de KPIs, cores semânticas de perdas/vendas/sobras, barras, tabelas, navegação, inputs, responsividade e acessibilidade — sem substituir HTML/JavaScript ou alterar o ETL. Referências e critérios em [Engenharia reversa visual](docs/ENGENHARIA_REVERSA_VISUAL_2026_10.md).
 
 Os menus estão implementados no frontend. **Os filtros de data e departamento usam o botão Aplicar e indicam alterações pendentes; os indicadores diferenciam faturamento diário, competência mensal e fontes insuficientemente cobertas.** **Alguns recursos dependem de usuário autorizado, migrações SQL aplicadas e dados presentes para a loja selecionada.** Indicadores com cobertura incompleta indicam ausência de comparabilidade, em vez de fabricar percentuais.
 

@@ -4,20 +4,21 @@ const sum=(a,i)=>a.reduce((s,r)=>s+Number(r[i]),0);
 const days=m=>new Date(Number(m.slice(0,4)),Number(m.slice(5)),0).getDate();
 const monthEnd=m=>m+'-'+String(days(m)).padStart(2,'0');
 const dateList=m=>Array.from({length:days(m)},(_,i)=>m+'-'+String(i+1).padStart(2,'0'));
-const monthRange=(a,b)=>{a=a.slice(0,7);b=b.slice(0,7);let out=[],d=new Date(a+'-01T12:00:00Z');while(d.toISOString().slice(0,7)<=b&&out.length<120){out.push(d.toISOString().slice(0,7));d.setUTCMonth(d.getUTCMonth()+1)}return out};
+const monthRange=(a,b)=>{a=a.slice(0,7);b=b.slice(0,7);let out=[],d=new Date(a+'-01T12:00:00Z');while(d.toISOString().slice(0,7)<=b){if(out.length>=120)throw Error('Período muito longo: selecione no máximo 120 meses.');out.push(d.toISOString().slice(0,7));d.setUTCMonth(d.getUTCMonth()+1)}return out};
 const asDateStart=v=>String(v||'').length===7?String(v)+'-01':String(v||'');
 const asDateEnd=v=>String(v||'').length===7?monthEnd(String(v)):String(v||'');
-const dateSpan=(a,b)=>{const out=[],d=new Date(a+'T12:00:00Z'),end=new Date(b+'T12:00:00Z');while(d<=end&&out.length<5000){out.push(d.toISOString().slice(0,10));d.setUTCDate(d.getUTCDate()+1)}return out};
+const validDate=v=>/^\d{4}-\d{2}-\d{2}$/.test(v)&&!Number.isNaN(Date.parse(v+'T12:00:00Z'))&&new Date(v+'T12:00:00Z').toISOString().slice(0,10)===v;
+const dateSpan=(a,b)=>{if(!validDate(a)||!validDate(b)||a>b)throw Error('Intervalo de datas inválido.');const out=[],d=new Date(a+'T12:00:00Z'),end=new Date(b+'T12:00:00Z');while(d<=end){if(out.length>=3660)throw Error('Período acima do limite de 10 anos.');out.push(d.toISOString().slice(0,10));d.setUTCDate(d.getUTCDate()+1)}return out};
 const lossTarget=data=>{const v=data?.baseline?.meta_perda;return typeof v==='number'&&Number.isFinite(v)&&v>=0&&v<=1?v:null};
 const dailyGoal=(data,dept='')=>{const v=data?.baseline?.meta_diaria,w=dept?(data.metas||[]).find(x=>x.codigo===dept)?.meta_participacao??(data.metas||[]).find(x=>x.codigo===dept)?.participacao:1;return typeof v==='number'&&Number.isFinite(v)&&v>=0&&typeof w==='number'&&Number.isFinite(w)&&w>=0&&w<=1?Math.round(v*w*100)/100:null};
 
 function select(data,from,to,dept=''){
  const start=asDateStart(from),requestedEnd=asDateEnd(to);
- if(!/^\d{4}-\d{2}-\d{2}$/.test(start)||!/^\d{4}-\d{2}-\d{2}$/.test(requestedEnd)||start>requestedEnd)throw Error('Período inválido.');
+ if(!validDate(start)||!validDate(requestedEnd)||start>requestedEnd)throw Error('Período inválido.');
+ const requestedCalendar=dateSpan(start,requestedEnd);
  const months=monthRange(start,requestedEnd),covered=new Set(data.dias_vendas_completos||[]),allM=data.vendas_mensais||[],dailyRows=data.vendas_diarias_resumo||[];
- const orderedCovered=[...covered].filter(d=>d>=start&&d<=requestedEnd).sort(),lastCovered=orderedCovered.at(-1);
- const cut=lastCovered&&lastCovered<requestedEnd&&lastCovered.slice(0,7)===requestedEnd.slice(0,7)?lastCovered:null;
- const end=cut||requestedEnd,sales=[],salesDays=new Set(),sources=[],missing=[],comparisonCoverage=new Set();
+ // Never silently truncate the selected end date to the last sale recorded.
+ const end=requestedEnd,cut=null,sales=[],salesDays=new Set(),sources=[],missing=[],comparisonCoverage=new Set();
 
  for(const m of months){
   const segStart=start>m+'-01'?start:m+'-01',mEnd=monthEnd(m),segEnd=end<mEnd?end:mEnd;
@@ -36,7 +37,8 @@ function select(data,from,to,dept=''){
    for(const r of dr)if(covered.has(r[0]))sales.push([r[0],'',r[1],0,Number(r[2])]);
    partial.forEach(d=>{salesDays.add(d);comparisonCoverage.add(d)});
    if(partial.length)sources.push(m+': diária parcial');
-   missing.push(segStart===segEnd?segStart:segStart+' a '+segEnd);
+   const absent=calendar.filter(d=>!covered.has(d));
+   if(absent.length)missing.push(absent.length===1?absent[0]:absent[0]+' a '+absent.at(-1)+' ('+absent.length+' dias sem cobertura)');
   }
  }
 
@@ -45,13 +47,15 @@ function select(data,from,to,dept=''){
  loss=lossAll.filter(r=>r[0]<=end),
  first=(data.perdas||[]).reduce((d,r)=>r[0]<d?r[0]:d,'9999-12-31'),
  last=(data.perdas||[]).reduce((d,r)=>r[0]>d?r[0]:d,'0000-01-01'),
- calendar=dateSpan(start,end),
- comparable=calendar.length>0&&!missing.length&&calendar.every(d=>comparisonCoverage.has(d)&&d>=first&&d<=last),
+ calendar=requestedCalendar,
+ salesComplete=calendar.length>0&&calendar.every(d=>comparisonCoverage.has(d)),
+ lossSpanComplete=calendar.length>0&&first<=start&&last>=end,
+ comparable=salesComplete&&lossSpanComplete,
  sv=sum(sl,4),lv=sum(loss,5),dailyGoalValue=dailyGoal(data,dept);
 
  return {
   months,start,end,requestedEnd,sales:sl,loss,lossAll,lossTotalAll:sum(lossAll,5),
-  unmatchedLossCount:lossAll.length-loss.length,salesDays,sources,missing,comparable,
+  unmatchedLossCount:0,salesDays,sources,missing,comparable,salesComplete,lossSpanComplete,
   salesTotal:sv,lossTotal:lv,ratio:comparable&&sv>0?lv/sv:null,days:calendar.length,
   goal:dailyGoalValue==null?null:Math.round(dailyGoalValue*calendar.length*100)/100,first,last,cut
  };
@@ -86,6 +90,6 @@ function validateLossImport(d,data){
  }
  return d.rows;
 }
-const api={dailyGoal,lossTarget,sum,days,monthEnd,dateList,dateSpan,monthRange,asDateStart,asDateEnd,select,departmentRows,departmentAnalytics,weekdays,validateLossImport};
+const api={dailyGoal,lossTarget,sum,days,monthEnd,dateList,dateSpan,monthRange,validDate,asDateStart,asDateEnd,select,departmentRows,departmentAnalytics,weekdays,validateLossImport};
 root.ZAI=api;if(typeof module!=='undefined')module.exports=api;
 })(typeof window==='undefined'?globalThis:window);

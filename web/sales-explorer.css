@@ -66,3 +66,14 @@
 }
 @media(prefers-reduced-motion:reduce){.sales-spinner{animation:none}}
 @media print{.sales-explorer-title #salesCsv,.sales-products-pager{display:none!important}#products>.table-wrap{max-height:none;overflow:visible}}
+
+/* Acesso visível a produtos mesmo quando a tabela está após gráficos e KPIs. */
+.sales-jump-to-products{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;margin:1px 0 15px;padding:13px 17px;border-radius:12px;border:1px solid #cbdfe9;background:linear-gradient(90deg,#f0f7fa,#fff 85%);box-shadow:0 1px 4px rgba(25,68,91,.03)}
+.sales-jump-to-products>div{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;min-width:0}
+.sales-jump-to-products .section-kicker{font-size:9.5px;margin:0}
+.sales-jump-to-products strong{font-size:13px;color:#1d435b;font-weight:760}
+.sales-jump-to-products span:last-child{font-size:11px;color:#647e8e}
+.sales-jump-to-products button{min-height:39px;background:#e4f0f6;color:#1c5975;border:1px solid #bfd9e7;font-weight:750;white-space:nowrap}
+.sales-jump-to-products button:hover{background:#d4e8f3;border-color:#8dbad0}
+.sales-explorer-title{scroll-margin-top:18px}
+@media(max-width:760px){.sales-jump-to-products{padding:12px;gap:11px}.sales-jump-to-products>div{flex-direction:column;gap:3px}.sales-jump-to-products button{width:100%}}

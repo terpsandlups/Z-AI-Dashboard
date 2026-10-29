@@ -5,7 +5,7 @@
 
 **Transformando relatórios do ERP em indicadores confiáveis, investigação por produto e decisões de loja.**
 
-[🌐 Abrir dashboard na Vercel](https://z-ai-dashboard-preview.vercel.app/) · [📐 Arquitetura](docs/ARQUITETURA.md) · [🔄 ETL e importações](docs/ETL_E_IMPORTACOES.md) · [📊 Dashboards](docs/DASHBOARDS_E_INDICADORES.md) · [🗺️ Roadmap](docs/ROADMAP.md) · [🔎 Engenharia reversa](docs/REFERENCIAS_ENGENHARIA_REVERSA.md) · [🎨 Engenharia reversa visual](docs/ENGENHARIA_REVERSA_VISUAL_2026_10.md) · [✅ Auditoria de filtros](docs/AUDITORIA_FILTROS_2026-10.md) · [📦 Vendas históricas por SKU](docs/RECUPERACAO_VENDAS_HISTORICAS.md)
+[🌐 Abrir dashboard na Vercel](https://z-ai-dashboard-preview.vercel.app/) · [📐 Arquitetura](docs/ARQUITETURA.md) · [🔄 ETL e importações](docs/ETL_E_IMPORTACOES.md) · [📊 Dashboards](docs/DASHBOARDS_E_INDICADORES.md) · [🗺️ Roadmap](docs/ROADMAP.md) · [🔎 Engenharia reversa](docs/REFERENCIAS_ENGENHARIA_REVERSA.md) · [🎨 Engenharia reversa visual](docs/ENGENHARIA_REVERSA_VISUAL_2026_10.md) · [✅ Auditoria de filtros](docs/AUDITORIA_FILTROS_2026-10.md) · [📦 Vendas históricas por SKU](docs/RECUPERACAO_VENDAS_HISTORICAS.md) · [🧾 Auditoria final por SKU](docs/CONFERENCIA_HISTORICO_SKU_2026-10.md)
 
 **Piloto:** Loja **007 — Kalimera Japy** · Grupo MONTEKALI  
 **Stack:** HTML · CSS · JavaScript · Python · PostgreSQL/Supabase · SQL/PLpgSQL · Vercel · GitHub
@@ -91,7 +91,7 @@ A **Central de Importações** aplica um fluxo de **Extract → Transform → Lo
 - **% de perdas consolidadas** = **Perdas consolidadas / Vendas comparáveis**.
 - **Meta por loja / departamento** = comparação do realizado com a referência configurada. O piloto usa uma referência geral de perdas de **2,40%** e meta diária de vendas de **R$ 180 mil**; outros setores podem ter metas próprias.
 - **Cobertura temporal:** o sistema evita somar mensal e diário duas vezes e sinaliza quando perdas e vendas não cobrem o mesmo período.
-- **Vendas por SKU restauradas:** janeiro–agosto/2026 agora podem ser consultados por produto e departamento no mês fechado a partir dos registros históricos já armazenados no Supabase; não é necessário importar novamente. Consultas de dias específicos exigem fatos diários do SKU.
+- **Vendas por SKU restauradas e paginadas:** janeiro–agosto/2026 podem ser consultados por produto e departamento no mês fechado a partir dos registros já armazenados no Supabase. O explorador usa paginação de 40 linhas, pesquisa por SKU/descrição no banco, totais conciliados e CSV completo. Consultas de dias específicos exigem movimentos diários por SKU; o resumo diário por departamento não substitui esses movimentos.
 - **Ranking de auditorias:** faltas da maior para a menor; depois sobras da maior para a menor, com ordenação aplicada antes da paginação na consulta SQL.
 
 **O foco não é preencher telas com gráficos.** Cada visualização deve ajudar a detectar concentração, recorrência, diferenças por departamento, desvios de meta ou produtos que precisam de ação.

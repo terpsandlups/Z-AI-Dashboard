@@ -54,11 +54,7 @@ BEGIN
   'pagina',p_pagina,
   'tamanho',p_tamanho,
   'periodo_inicio',p_de,'periodo_fim',p_ate,
-  'granularidade',CASE WHEN EXISTS(
-    SELECT 1 FROM montekali.vendas_mensais m
-     WHERE m.loja_codigo=p_loja
-       AND m.competencia BETWEEN date_trunc('month',p_de)::date AND date_trunc('month',p_ate)::date
-    ) THEN 'mista_ou_mensal' ELSE 'diaria' END
+  'granularidade','consulta_consolidada'
  ) INTO v_result;
  RETURN v_result;
 END $$;

@@ -54,6 +54,7 @@ function p360Page(){
  const result=chosen&&totalEvents?`
   <div class="p360-title"><div><p class="eyebrow">FICHA ANALÍTICA DO PRODUTO</p><h2>${esc(chosen.produto||selectTitle)}</h2><p class="small muted">SKU ${esc(chosen.sku)} · ${esc(chosen.marca||'Marca não cadastrada')} · ${esc(chosen.situacao||'Situação não informada')}</p></div><button id="p360Export" type="button">Exportar lançamentos CSV</button></div>
   ${!full?`<div class="notice">Cobertura de vendas incompleta: ${num(cover?.dias_cobertos||0)} de ${num(cover?.dias_periodo||0)} dias. Os valores conhecidos são exibidos, mas <strong>a taxa de perdas fica indisponível</strong> para evitar comparação distorcida.</div>`:`<p class="small muted">Cobertura integral de vendas: ${num(cover?.dias_cobertos||0)} de ${num(cover?.dias_periodo||0)} dias. Percentual calculado no mesmo período selecionado.</p>`}
+  ${(chosen.competencias_mensais||[]).length?`<div class="notice">Histórico por SKU recuperado do fechamento mensal de ${esc(chosen.competencias_mensais.join(', '))}. Na evolução abaixo, as vendas mensais são agrupadas no último dia da competência apenas como referência visual — <strong>não significa que foram vendidas nessa data</strong>.</div>`:''}
   <div class="kpis">
     ${card('Vendas totais',money(Number(d.vendas||0)),num(Number(d.quantidade_vendida||0))+' unidades de origem')}
     ${card('Perdas reconhecidas',money(Number(d.reconhecidas||0)),num(d.ocorrencias_quebra||0)+' ocorrências')}
@@ -72,7 +73,7 @@ function p360Page(){
     ${table(['Motivo original','Ocorrências','Total'],(chosen.motivos||[]).map(r=>[esc(r.motivo||'Não informado'),num(Number(r.ocorrencias||0)),money(Number(r.valor||0))]))}
    </article>
   </div>
-  <article class="card table-section"><h2>Evolução diária do SKU</h2><p class="desc">Dias com movimento de venda, perda reconhecida ou ajuste de estoque. Dias sem movimento não são inventados.</p>
+  <article class="card table-section"><h2>Evolução por data e competência</h2><p class="desc">Movimentos com data diária; vendas históricas mensais aparecem na data de encerramento da competência, sem representar venda naquele dia.</p>
     ${table(['Data','Vendas','Reconhecidas','Faltas','Sobras','Consolidada'],(chosen.diario||[]).slice(-45).reverse().map(r=>[
      p360AsText(r.data),money(Number(r.vendas||0)),money(Number(r.reconhecidas||0)),money(Number(r.faltas||0)),money(Number(r.sobras||0)),
      money(Number(r.reconhecidas||0)+Number(r.faltas||0)-Number(r.sobras||0))

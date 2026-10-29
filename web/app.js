@@ -142,7 +142,12 @@ async function request(path,body,auth=true){
 function setData(d,isCloud){
  if(d.schema!=='zai-007-v2'||!/^\d{3}$/.test(d.loja)||!Array.isArray(d.perdas)||!d.departamentos||!d.produtos)throw Error('Base analítica incompatível.');
  if(![d.perdas,d.vendas_mensais||[],d.vendas_diarias||[]].every(a=>a.every(r=>Array.isArray(r)&&r.every(x=>typeof x==='string'||typeof x==='number'))))throw Error('Linhas inválidas na base.');
- data=applyOfficialGoals(d);cloud=isCloud;pending=null;activeStore=d.loja;salesProductRows=[];salesProductKey='';salesProductError='';salesProductToken++;tradeSupplier='';tradeCategory='';tradeBrand='';tradeQuery='';syncStores();
+ const sameStore=activeStore===d.loja;
+ data=applyOfficialGoals(d);cloud=isCloud;pending=null;activeStore=d.loja;salesProductRows=[];salesProductKey='';salesProductError='';salesProductToken++;
+ if(!sameStore){tradeSupplier='';tradeCategory='';tradeBrand='';tradeQuery='';}
+ auditData=null;auditLoadedKey='';auditPage=0;
+ recResult=null;recKey='';recError='';recPending='';p360Result=null;p360CacheKey='';p360Error='';p360RequestId++;tradeTaskLoaded='';
+ syncStores();
  $('#sourceBadge').textContent=isCloud?'Supabase · '+d.loja:'Conferência local · não salva na nuvem';$('#refresh').hidden=!isCloud;$('#logout').hidden=!session;$('#loginOpen').textContent=isCloud?'Conta conectada':'Conectar Supabase';
  $('#dept').innerHTML='<option value="">Todos os departamentos</option>'+departmentOptions(data).map(([k,v])=>`<option value="${esc(k)}">${esc(k+' · '+v)}</option>`).join('');
  const dates=[...(d.dias_vendas_completos||[]),...(d.perdas||[]).map(r=>r[0]),...(d.auditorias_diarias_resumo||[]).map(r=>r[0])].filter(x=>/^\d{4}-\d{2}-\d{2}$/.test(x)).sort();
@@ -159,7 +164,12 @@ function commitGlobalFilters(){
  if(!ZAI.validDate(from)||!ZAI.validDate(to)||from>to){msg('Período inválido: confira as datas inicial e final.',true);return false;}
  try{ZAI.dateSpan(from,to);ZAI.monthRange(from,to)}catch(e){msg(e.message,true);return false;}
  if(dept&&!data?.departamentos?.[dept]){msg('Departamento inválido para a loja atual.',true);return false;}
+ const old=appliedFilters,changed=!old||old.from!==from||old.to!==to||old.dept!==dept;
  appliedFilters={from,to,dept};
+ if(changed){productPage=0;lossPage=0;auditPage=0;auditData=null;auditLoadedKey='';
+  salesProductRows=[];salesProductKey='';salesProductError='';salesProductToken++;
+  recResult=null;recKey='';recError='';recPending='';
+  p360Result=null;p360CacheKey='';p360Error='';p360RequestId++;}
  msg('Filtro aplicado: '+from.split('-').reverse().join('/')+' a '+to.split('-').reverse().join('/')+(dept?' · Departamento '+dept:''));
  return true;
 }

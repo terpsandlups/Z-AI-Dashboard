@@ -459,3 +459,8 @@ footer{padding:24px 0 0;font-size:11px;color:#84929c}
   .head-actions{align-items:flex-start}
   .store-control{width:100%}.store-control select{width:100%;max-width:none}
 }
+
+/* Estado explícito para filtros de aplicação manual (padrão de dashboards BI). */
+.filters .filter-pending{font-size:11px;color:#805519;font-weight:650;padding:4px 7px;background:#fff7e8;border-radius:7px;white-space:nowrap}
+.filters .filter-pending[hidden]{display:none}
+@media(max-width:900px){.filters .filter-pending{white-space:normal}}

@@ -129,7 +129,7 @@ function departmentOptions(snapshot){
 }
 const BASE=window.ZAI_CONFIG?.supabaseUrl||'',KEY=window.ZAI_CONFIG?.publishableKey||'';
 let activeStore='',accessibleStores=[],requestVersion=0;
-let data=null,page=0,cloud=false,session=null,context=null,pending=null,productPage=0,productQuery='',activeDept='',productStatus='',compareAFrom='',compareATo='',compareBFrom='',compareBTo='',compareDept='',salesProductRows=[],salesProductKey='',salesProductLoading=false,tradeSupplier='',tradeCategory='',tradeBrand='',tradeQuery='',consolidatedKind='';
+let data=null,page=0,cloud=false,session=null,context=null,pending=null,appliedFilters=null,compareScopeKey='',productPage=0,productQuery='',activeDept='',productStatus='',compareAFrom='',compareATo='',compareBFrom='',compareBTo='',compareDept='',salesProductRows=[],salesProductKey='',salesProductLoading=false,tradeSupplier='',tradeCategory='',tradeBrand='',tradeQuery='',consolidatedKind='';
 function msg(s,error=false){$('#message').innerHTML=s?`<div class="notice ${error?'error':'info'}">${esc(s)}</div>`:''}
 function download(filename,text,type='application/json'){const u=URL.createObjectURL(new Blob([text],{type})),a=document.createElement('a');a.href=u;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(u),3000)}
 function csv(name,headers,rows){const cell=v=>'"'+String(v??'').replace(/^[=+@-]/,"'").replace(/"/g,'""')+'"';download(name,'\ufeff'+[headers,...rows].map(r=>r.map(cell).join(';')).join('\r\n'),'text/csv;charset=utf-8')}
@@ -147,8 +147,21 @@ function setData(d,isCloud){
  $('#dept').innerHTML='<option value="">Todos os departamentos</option>'+departmentOptions(data).map(([k,v])=>`<option value="${esc(k)}">${esc(k+' · '+v)}</option>`).join('');
  const dates=[...(d.dias_vendas_completos||[]),...(d.perdas||[]).map(r=>r[0]),...(d.auditorias_diarias_resumo||[]).map(r=>r[0])].filter(x=>/^\d{4}-\d{2}-\d{2}$/.test(x)).sort();
  const latestSales=[...(d.dias_vendas_completos||[])].sort().at(-1),latest=latestSales||dates.at(-1);
- if(latest){$('#from').value=latest.slice(0,7)+'-01';$('#to').value=latest}
+ const prev=appliedFilters;
+ const chosen=prev&&ZAI.validDate(prev.from)&&ZAI.validDate(prev.to)&&prev.from<=prev.to?prev:null;
+ if(chosen){$('#from').value=chosen.from;$('#to').value=chosen.to;$('#dept').value=chosen.dept&&data.departamentos[chosen.dept]?chosen.dept:'';}
+ else if(latest){$('#from').value=latest.slice(0,7)+'-01';$('#to').value=latest;$('#dept').value='';}
+ appliedFilters={from:$('#from').value,to:$('#to').value,dept:$('#dept').value};
  render();
+}
+function commitGlobalFilters(){
+ const from=$('#from').value,to=$('#to').value,dept=$('#dept').value;
+ if(!ZAI.validDate(from)||!ZAI.validDate(to)||from>to){msg('Período inválido: confira as datas inicial e final.',true);return false;}
+ try{ZAI.dateSpan(from,to);ZAI.monthRange(from,to)}catch(e){msg(e.message,true);return false;}
+ if(dept&&!data?.departamentos?.[dept]){msg('Departamento inválido para a loja atual.',true);return false;}
+ appliedFilters={from,to,dept};
+ msg('Filtro aplicado: '+from.split('-').reverse().join('/')+' a '+to.split('-').reverse().join('/')+(dept?' · Departamento '+dept:''));
+ return true;
 }
 function card(title,value,note,hero=false){return `<article class="card kpi ${hero?'hero':''}"><label>${esc(title)}</label><b>${value}</b><small>${note}</small></article>`}
 function table(headers,rows){return `<div class="table-wrap"><table><thead><tr>${headers.map((h,i)=>`<th class="${i?'num':''}">${h}</th>`).join('')}</tr></thead><tbody>${rows.length?rows.map(row=>'<tr>'+row.map((x,i)=>`<td class="${i?'num':''}">${x}</td>`).join('')+'</tr>').join(''):`<tr><td colspan="${headers.length}">Sem registros para este filtro.</td></tr>`}</tbody></table></div>`}
@@ -190,13 +203,15 @@ function consolidatedDepartments(from,to,dept=''){
 }
 function shiftDate(d,delta){const x=new Date(d+'T12:00:00Z');x.setUTCDate(x.getUTCDate()+delta);return x.toISOString().slice(0,10)}
 function initComparePeriods(){
- if(compareBFrom&&compareBTo&&compareAFrom&&compareATo)return;
- compareBFrom=$('#from').value;compareBTo=$('#to').value;
+ const key=[activeStore,appliedFilters?.from,appliedFilters?.to].join('|');
+ if(compareScopeKey===key&&compareBFrom&&compareBTo&&compareAFrom&&compareATo)return;
+ compareScopeKey=key;
+ compareBFrom=appliedFilters?.from||$('#from').value;compareBTo=appliedFilters?.to||$('#to').value;
  const len=ZAI.dateSpan(compareBFrom,compareBTo).length||1;
  compareATo=shiftDate(compareBFrom,-1);compareAFrom=shiftDate(compareATo,-len+1);
 }
 function trend(){
- const cs=context.months.map(m=>ZAI.select(data,m,m,$('#dept').value)),maxS=Math.max(...cs.map(c=>c.salesTotal),1),maxL=Math.max(...cs.map(c=>c.lossTotal),1);
+ const cs=context.months.map(m=>ZAI.select(data,context.start>m+'-01'?context.start:m+'-01',context.requestedEnd<ZAI.monthEnd(m)?context.requestedEnd:ZAI.monthEnd(m),$('#dept').value)),maxS=Math.max(...cs.map(c=>c.salesTotal),1),maxL=Math.max(...cs.map(c=>c.lossTotal),1);
  // Separate scales explicitly labelled; rate uses a separate comparison table.
  const W=640,H=205,L=70,R=58,T=20,B=37,px=i=>L+(W-L-R)*(cs.length===1?.5:i/(cs.length-1)),py=(v,max)=>H-B-(H-B-T)*v/max;
  const points=(k,max)=>cs.map((c,i)=>k==='salesTotal'&&!c.sales.length?null:[px(i),py(c[k],max)]);
@@ -342,7 +357,7 @@ function targets(){
  '</article>';
 }
 function sales(){const c=context,w=ZAI.weekdays(data,c,$('#dept').value),da=departmentAnalyticsContext(),r=da.rows;
- return `<div class="kpis">${card('Faturamento',c.sales.length?money(c.salesTotal):'—','Receita no período selecionado',true)}${card('Meta de vendas',money(c.goal),num(c.days)+' dias comparáveis')}${card('Média diária',c.salesDays.size?money(c.salesTotal/c.salesDays.size):'—',num(c.salesDays.size)+' dias cobertos')}${card('Departamentos com venda',num(r.filter(x=>x.sales>0).length),'No filtro atual')}</div>
+ return `<div class="kpis">${card('Faturamento',c.sales.length?money(c.salesTotal):'—','Receita no período selecionado',true)}${card('Meta de vendas',money(c.goal),num(c.days)+' dias no intervalo selecionado')}${card('Média diária',c.salesDays.size?money(c.salesTotal/c.salesDays.size):'—',num(c.salesDays.size)+' dias de vendas cobertos')}${card('Departamentos com venda',num(r.filter(x=>x.sales>0).length),'No filtro atual')}</div>
  <div class="grid2"><article class="card"><h2>Vendas por departamento</h2><p class="desc">Top 10 por faturamento no intervalo exato.</p>${bars(r.filter(x=>x.sales>0).slice(0,10).map(x=>[x.name,x.sales]))}</article><article class="card"><h2>Média por dia da semana</h2><p class="desc">Base diária do período selecionado.</p>${w.some(x=>x.days)?bars(w.map((x,i)=>[['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'][i]+' · '+x.days+' dias',x.mean||0,money(x.mean)])):'<div class="notice">Sem cobertura diária suficiente para este intervalo.</div>'}</article></div>${departmentFocus(r)}<article class="card"><h2>Participação por departamento</h2><p class="desc">Venda do departamento ÷ faturamento total da loja no mesmo período.</p>${table(['Departamento','Vendas','Meta participação','Participação real','Desvio p.p.'],r.map(x=>{const goal=(data.metas||[]).find(g=>g.codigo===x.code)?.meta_participacao??null;return [esc(x.code+' · '+x.name),money(x.sales),pct(goal),pct(x.salesShare),goal==null||x.salesShare==null?'—':pp(x.salesShare-goal)]}))}</article>${targets()}
  <article class="card"><div class="section-title compact"><div><span class="section-kicker">DIA A DIA</span><h2>Meta diária × realizado</h2></div></div><p class="desc">A meta diária da loja é distribuída pelo percentual oficial do departamento quando houver filtro setorial.</p>${dailySalesGoalChart()}</article>
   <div class="section-title"><h2>Departamento → Produto</h2><button id="salesCsv">Exportar produtos CSV</button></div><article class="card"><div class="searchrow"><input id="productSearch" placeholder="Buscar SKU ou produto" value="${esc(productQuery)}"><select id="productStatus"><option value="">Todos os status</option><option>Ativo</option><option>Inativo</option><option>Nao informado</option></select></div><div id="products"></div></article>`;
@@ -588,17 +603,18 @@ function exchange(){return `<div class="grid2"><article class="card"><h2>Central
  <article class="card"><div class="section-title compact"><div><span class="section-kicker">RASTREABILIDADE</span><h2>Histórico de importações</h2></div></div><p class="desc">Desfaça apenas lotes elegíveis, com confirmação e justificativa. O registro do lote permanece auditável. Cargas substitutivas e lotes sem restauração segura exigem análise administrativa.</p><div id="importHistoryGrid">${cloud?'<div class="loading-state">Consultando histórico seguro da loja…</div>':table(['Arquivo','Quando','Registros','Valor','Tipo'],(data?.historico||[]).map(r=>[esc(r.file||''),esc(r.when?new Date(r.when).toLocaleString('pt-BR'):''),num(r.rows||0),money(r.value||0),esc(r.tipo||'Backup histórico')]))}</div></article>`;}
 function empty(){return `<article class="card empty"><span class="number">Z</span><h2>Seu painel, conectado às suas lojas</h2><p>Entre na conta do Supabase para consultar os dados salvos. Para conferir esta versão antes da ativação, abra <b>data/base_conferida.json</b> no menu Importar e Exportar.</p><div class="actions" style="justify-content:center"><button class="primary" id="emptyLogin">Conectar Supabase</button><button id="emptyLocal">Abrir base de conferência</button></div></article>`;}
 function render(){
+ if(data&&appliedFilters){$('#from').value=appliedFilters.from;$('#to').value=appliedFilters.to;$('#dept').value=appliedFilters.dept||'';}
  $('#nav').innerHTML=names.map((n,i)=>`<button data-page="${i}" class="${page===i?'active':''}" title="${esc(n)}" aria-label="${esc(n)}" aria-current="${page===i?'page':'false'}"><span class="navicon" aria-hidden="true">${navIcons[i]}</span><span class="navlabel">${n}</span></button>`).join('');$('#nav').querySelectorAll('button').forEach(b=>b.onclick=()=>{page=+b.dataset.page;msg('');render()});
  $('#pageTitle').textContent=names[page];$('.subtitle').textContent=subtitles[page]||'Dashboard Executivo';$('#filters').hidden=!data||page===3||page===6||page===7;$('#coverage').innerHTML='';$('#stamp').textContent='Consultado em '+new Date().toLocaleString('pt-BR');
- if(data&&[0,1,2,4,5,8].includes(page)){let from=$('#from').value,to=$('#to').value;if(!from||!to||from>to){msg('Informe datas válidas, com início anterior ao fim.',true);return}context=ZAI.select(data,from,to,$('#dept').value);$('#periodNote').textContent=context.days+' dias no período · '+(context.sources.length?context.sources.join(' / '):'vendas não disponíveis');
- const notices=[];if(context.cut)notices.push('Indicadores comparáveis até '+context.cut.split('-').reverse().join('/')+'.');if(context.unmatchedLossCount)notices.push(num(context.unmatchedLossCount)+' lançamentos posteriores às vendas continuam visíveis em Perdas Reconhecidas.');if(context.missing.length)notices.push('Sem venda diária completa em '+context.missing.join(', ')+'.');if(!context.comparable&&!context.missing.length)notices.push('O percentual exige cobertura compatível entre vendas e perdas.');
+ if(data&&[0,1,2,4,5,8,9].includes(page)){let from=$('#from').value,to=$('#to').value;if(!from||!to||from>to){msg('Informe datas válidas, com início anterior ao fim.',true);return}context=ZAI.select(data,from,to,$('#dept').value);$('#periodNote').textContent=context.days+' dias no período · '+(context.sources.length?context.sources.join(' / '):'vendas não disponíveis');
+ const notices=[];if(!context.salesComplete)notices.push('Vendas incompletas no período: '+(context.missing.join('; ')||'faltam datas')+'. O faturamento exibido pode ser parcial.');if([0,1,4,5].includes(page)&&!context.lossSpanComplete)notices.push('Perda/venda indisponível: os lançamentos reconhecidos conhecidos vão de '+(context.first==='9999-12-31'?'data não informada':context.first)+' até '+(context.last==='0000-01-01'?'data não informada':context.last)+'.');
  $('#coverage').innerHTML=notices.length?`<div class="notice coverage-summary">${notices.map(esc).join(' · ')}</div>`:'';
  }
  $('#content').innerHTML=page===7?exchange():page===8?p360Page():page===9?recPage():!data?empty():page===0?executive():page===1?losses():page===2?sales():page===3?compare():future();
  if($('#emptyLogin'))$('#emptyLogin').onclick=()=>$('#login').showModal();if($('#emptyLocal'))$('#emptyLocal').onclick=()=>{page=7;render();$('#localFile').click()};
- document.querySelectorAll('[data-focus-dept]').forEach(el=>el.onclick=()=>{$('#dept').value=el.dataset.focusDept;page=0;render()});
+ document.querySelectorAll('[data-focus-dept]').forEach(el=>el.onclick=()=>{$('#dept').value=el.dataset.focusDept;if(commitGlobalFilters()){page=0;render()}});
  document.querySelectorAll('[data-loss-kind]').forEach(el=>el.onclick=()=>{lossKind=el.dataset.lossKind;page=1;render()});
- document.querySelectorAll('[data-sales-day]').forEach(el=>el.onclick=()=>{$('#from').value=el.dataset.salesDay;$('#to').value=el.dataset.salesDay;render()});
+ document.querySelectorAll('[data-sales-day]').forEach(el=>el.onclick=()=>{$('#from').value=el.dataset.salesDay;$('#to').value=el.dataset.salesDay;if(commitGlobalFilters())render()});
  document.querySelectorAll('[data-consolidated-kind]').forEach(el=>el.onclick=()=>{consolidatedKind=el.dataset.consolidatedKind;render()});
  if($('#consolidatedKindFilter'))$('#consolidatedKindFilter').onchange=e=>{consolidatedKind=e.target.value;render()};
  if(page===1&&data)bindLossGrid();
@@ -846,4 +862,4 @@ function initPasswordRecovery(){
 }
 $('#loginOpen').onclick=()=>{loginMode('login');$('#login').showModal()};$('#loginClose').onclick=()=>$('#login').close();$('#forgotPassword').onclick=sendPasswordRecovery;$('#saveNewPassword').onclick=saveRecoveredPassword;$('#cancelRecovery').onclick=()=>loginMode('login');$('#loginForm').onsubmit=async e=>{e.preventDefault();$('#loginError').textContent='Conectando…';try{const r=await request('/auth/v1/token?grant_type=password',{email:$('#email').value,password:$('#password').value},false);session={...r,expires_at:Date.now()/1000+r.expires_in};$('#password').value='';$('#loginError').textContent='';$('#login').close();await refresh();}catch(e){$('#loginError').textContent=e.message}};
 initPasswordRecovery();
-$('#logout').onclick=async()=>{if(session)fetch(BASE+'/auth/v1/logout',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+session.access_token}}).catch(()=>{});requestVersion++;session=null;data=null;cloud=false;context=null;pending=null;activeStore='';accessibleStores=[];syncStores();$('#logout').hidden=true;$('#refresh').hidden=true;$('#sourceBadge').textContent='Sessão encerrada';$('#loginOpen').textContent='Conectar Supabase';msg('');render()};$('#refresh').onclick=()=>refresh();$('#apply').onclick=()=>{productPage=0;render()};
+$('#logout').onclick=async()=>{if(session)fetch(BASE+'/auth/v1/logout',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+session.access_token}}).catch(()=>{});requestVersion++;session=null;data=null;cloud=false;context=null;pending=null;activeStore='';accessibleStores=[];syncStores();$('#logout').hidden=true;$('#refresh').hidden=true;$('#sourceBadge').textContent='Sessão encerrada';$('#loginOpen').textContent='Conectar Supabase';msg('');render()};$('#refresh').onclick=()=>refresh();$('#apply').onclick=()=>{if(!commitGlobalFilters())return;productPage=0;render()};

@@ -62,8 +62,8 @@ function recPage(){
 async function recLoad(force=false){
  if(!cloud||!data||page!==9)return;
  const key=recQueryKey();
- if(ZAI.dateSpan($('#from').value,$('#to').value).length>366){recError='A análise de recorrência suporta até 366 dias. Selecione um intervalo menor e aplique o filtro.';recResult=null;recKey=key;return;}
  if(!force&&recKey===key&&(recResult||recError))return;
+ if(ZAI.dateSpan($('#from').value,$('#to').value).length>366){recError='A análise de recorrência suporta até 366 dias. Selecione um intervalo menor e aplique o filtro.';recResult=null;recKey=key;render();return;}
  if(recPending===key)return;
  recPending=key;recError='';
  try{

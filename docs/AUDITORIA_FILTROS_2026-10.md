@@ -24,7 +24,7 @@ A revisão adotou **padrões de comportamento**, não cópia de código:
 |---|---|---|
 | **Visão Executiva** | Loja + datas inclusivas + departamento. Perdas e vendas só produzem taxa com cobertura suficiente | Sem truncar último dia; fontes de venda e perda sinalizadas separadamente; período válido e explícito |
 | **Perdas Reconhecidas** | Movimentos por data original dentro do intervalo; agrupamento mantém todas as ocorrências | Não descartar quebras posteriores à última venda; filtro global só muda após Aplicar; export CSV com datas |
-| **Vendas & Participação** | Faturamento diário ou total mensal consolidado, sem dupla soma | Não misturar venda mensal com semana parcialmente detalhada; ocultar série/produtos diários incompletos; meta reflete os dias selecionados |
+| **Vendas & Participação** | Faturamento diário ou total mensal consolidado, sem dupla soma | Não misturar resumo mensal com gráficos diários incompletos; **vendas antigas por SKU restauradas em competência mensal**; meta reflete os dias selecionados |
 | **Comparador de Períodos** | Dois intervalos independentes, validados antes da consulta | Mantém referência do global ao abrir, preserva edição específica, informa durações diferentes e cobertura insuficiente, export com intervalos |
 | **Perdas Desconhecidas — Inventário** | Consultas por loja, data, departamento, tipo e SKU | Invalidação de consulta antiga, erro sem recarga infinita, export bloqueado caso filtro mude ou limite cause corte |
 | **Perdas Consolidadas** | Reconhecidas + faltas − sobras dentro do mesmo período | Datas inclusivas e nenhum movimento removido por corte automático de vendas; taxa condicionada à cobertura |
@@ -45,7 +45,7 @@ A revisão adotou **padrões de comportamento**, não cópia de código:
 
 **Antes:** um mês com faturamento **mensal** poderia mostrar gráficos por dia da semana ou produtos diários de uma amostra incompleta, divergindo dos KPIs totais.
 
-**Agora:** um período abastecido por competência mensal continua exibindo faturamento e participação quando o mês é completo, mas **não apresenta** desdobramento semanal, gráfico de meta diária ou detalhe por SKU como se fosse exaustivo. O usuário recebe orientação para importar vendas diárias.
+**Agora:** um período abastecido por competência mensal continua exibindo faturamento e participação do mês completo, mas **não apresenta desdobramento semanal ou gráfico diário sem a respectiva fonte**. O detalhamento por SKU foi **restaurado a partir do resumo mensal já existente**, sem reimportar; nesses meses o SKU representa a competência inteira, não um dia específico.
 
 ### P1 — Filtro global invisível na Recorrência
 
@@ -110,7 +110,7 @@ Alguns testes do fluxo e a montagem dos dez módulos foram executados **em ambie
 ## Limites conhecidos e próximas validações
 
 1. **Perdas reconhecidas:** o snapshot atual usa o intervalo entre a primeira e a última ocorrência conhecida como **indício** de cobertura, não como comprovante formal de que todas as datas foram importadas. Evolução recomendada: `cobertura_perdas` própria por loja/data/lote, semelhante à cobertura de vendas, para certificar a taxa com base em fontes efetivamente completas.
-2. **Vendas por SKU:** para intervalos com apenas total mensal, não se pode extrair distribuição diária por produto sem o arquivo detalhado; o painel passa a explicitar essa restrição.
+2. **Vendas por SKU:** o histórico por produto dos meses fechados janeiro–agosto está preservado e agora é consultado por competência. Para **um trecho de mês antigo**, não existem fatos diários por SKU para determinar a venda exata; a aplicação explica o limite e não faz rateio fictício.
 3. **Trocas históricas:** o snapshot atual não pode ser fatiado por qualquer intervalo temporal; uma consulta histórica necessitaria snapshots versionados por período, não a posição vigente.
 4. **Banco operacional:** reconciliar janeiro de 2026 e outros períodos com consultas independentes ao Supabase quando a conexão administrativa estiver disponível. A auditoria de código não substitui conferência de registros reais.
 5. **Homologação UX:** testar sessão real em desktop e PDA/celular, inclusive limites, latência, rede instável e transição entre lojas.

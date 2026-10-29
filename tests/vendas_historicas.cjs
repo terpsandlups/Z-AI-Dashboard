@@ -17,7 +17,7 @@ sandbox.fixture=fixture;
 vm.runInContext('setData(fixture,false)',sandbox);
 vm.runInContext("$('#from').value='2026-01-01';$('#to').value='2026-01-31';commitGlobalFilters();page=2;render()",sandbox);
 assert.equal(vm.runInContext('context.salesTotal',sandbox),300);
-vm.runInContext("cloud=true;session={access_token:'fake',expires_at:9999999999};request=async(path,args)=>{if(!path.endsWith('zai_vendas_produtos_periodo')||args.p_de!=='2026-01-01'||args.p_ate!=='2026-01-31'||args.p_loja!=='007')throw Error('Wrong RPC or interval');return [{sku:'100',produto:'Produto fictício',dpto:'001',quantidade:3,valor:300,situacao:'Ativo'}]};",sandbox);
+vm.runInContext("cloud=true;salesProductKey='';session={access_token:'fake',expires_at:9999999999};request=async(path,args)=>{if(!path.endsWith('zai_vendas_produtos_periodo')||args.p_de!=='2026-01-01'||args.p_ate!=='2026-01-31'||args.p_loja!=='007')throw Error('Wrong RPC or interval');return [{sku:'100',produto:'Produto fictício',dpto:'001',quantidade:3,valor:300,situacao:'Ativo'}]};",sandbox);
 (async()=>{
  await vm.runInContext('loadSalesProducts()',sandbox);
  assert.equal(vm.runInContext('salesProductRows.length',sandbox),1);

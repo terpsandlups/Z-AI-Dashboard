@@ -182,7 +182,7 @@ function commitGlobalFilters(){
 function card(title,value,note,hero=false){
  // Somente apresentação: o tom indica a natureza do indicador, não seu resultado.
  const label=String(title).toLocaleLowerCase('pt-BR');
- const tone=/sobra|cr[eé]dito/.test(label)?'credit':/perda|quebra|falta|diverg[eê]ncia/.test(label)?'loss':/faturamento|venda|receita/.test(label)?'sales':/meta|objetivo/.test(label)?'target':'neutral';
+ const tone=/\bmeta\b|objetivo/.test(label)?'target':/sobra|cr[eé]dito/.test(label)?'credit':/perda|quebra|falta|diverg[eê]ncia/.test(label)?'loss':/faturamento|venda|receita/.test(label)?'sales':'neutral';
  return `<article class="card kpi ${hero?'hero':''}" data-tone="${tone}"><label>${esc(title)}</label><b>${value}</b><small>${note}</small></article>`;
 }
 function table(headers,rows){return `<div class="table-wrap"><table><thead><tr>${headers.map((h,i)=>`<th class="${i?'num':''}">${h}</th>`).join('')}</tr></thead><tbody>${rows.length?rows.map(row=>'<tr>'+row.map((x,i)=>`<td class="${i?'num':''}">${x}</td>`).join('')+'</tr>').join(''):`<tr><td colspan="${headers.length}">Sem registros para este filtro.</td></tr>`}</tbody></table></div>`}

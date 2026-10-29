@@ -285,6 +285,7 @@ function consolidatedTypeRows(from,to,type,dept=''){
   .sort((a,b)=>Math.abs(b.value)-Math.abs(a.value));
 }
 function dailySalesGoalChart(){
+ if(context.sources.some(x=>x.endsWith(': mensal')))return '<div class="notice">Há faturamento mensal sem todos os dias detalhados no intervalo. Para evitar um gráfico diário incompleto, importe as vendas diárias do ERP.</div>';
  const dept=$('#dept').value,goal=ZAI.dailyGoal(data,dept),start=context.start,end=context.end,covered=new Set(data.dias_vendas_completos||[]),map=new Map();
  for(const r of (data.vendas_diarias_resumo||[])){
   if(r[0]<start||r[0]>end||!covered.has(r[0])||(dept&&r[1]!==dept))continue;
@@ -366,9 +367,9 @@ function targets(){
  rows.map(r=>[esc(r.code+' · '+r.name),money(r.sold),pct(r.goal),pct(r.realized),pp(r.delta),money(ZAI.dailyGoal(data,r.code))]))+
  '</article>';
 }
-function sales(){const c=context,w=ZAI.weekdays(data,c,$('#dept').value),da=departmentAnalyticsContext(),r=da.rows;
+function sales(){const c=context,hasMonthly=c.sources.some(x=>x.endsWith(': mensal')),w=ZAI.weekdays(data,c,$('#dept').value),da=departmentAnalyticsContext(),r=da.rows;
  return `<div class="kpis">${card('Faturamento',c.sales.length?money(c.salesTotal):'—','Receita no período selecionado',true)}${card('Meta de vendas',money(c.goal),num(c.days)+' dias no intervalo selecionado')}${card('Média diária',c.salesDays.size?money(c.salesTotal/c.salesDays.size):'—',num(c.salesDays.size)+' dias de vendas cobertos')}${card('Departamentos com venda',num(r.filter(x=>x.sales>0).length),'No filtro atual')}</div>
- <div class="grid2"><article class="card"><h2>Vendas por departamento</h2><p class="desc">Top 10 por faturamento no intervalo exato.</p>${bars(r.filter(x=>x.sales>0).slice(0,10).map(x=>[x.name,x.sales]))}</article><article class="card"><h2>Média por dia da semana</h2><p class="desc">Base diária do período selecionado.</p>${w.some(x=>x.days)?bars(w.map((x,i)=>[['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'][i]+' · '+x.days+' dias',x.mean||0,money(x.mean)])):'<div class="notice">Sem cobertura diária suficiente para este intervalo.</div>'}</article></div>${departmentFocus(r)}<article class="card"><h2>Participação por departamento</h2><p class="desc">Venda do departamento ÷ faturamento total da loja no mesmo período.</p>${table(['Departamento','Vendas','Meta participação','Participação real','Desvio p.p.'],r.map(x=>{const goal=(data.metas||[]).find(g=>g.codigo===x.code)?.meta_participacao??null;return [esc(x.code+' · '+x.name),money(x.sales),pct(goal),pct(x.salesShare),goal==null||x.salesShare==null?'—':pp(x.salesShare-goal)]}))}</article>${targets()}
+ <div class="grid2"><article class="card"><h2>Vendas por departamento</h2><p class="desc">Top 10 por faturamento no intervalo exato.</p>${bars(r.filter(x=>x.sales>0).slice(0,10).map(x=>[x.name,x.sales]))}</article><article class="card"><h2>Média por dia da semana</h2><p class="desc">Base diária do período selecionado.</p>${!hasMonthly&&w.some(x=>x.days)?bars(w.map((x,i)=>[['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'][i]+' · '+x.days+' dias',x.mean||0,money(x.mean)])):'<div class="notice">'+(hasMonthly?'Média semanal indisponível: existe faturamento mensal sem detalhamento de todos os dias.':'Sem cobertura diária suficiente para este intervalo.')+'</div>'}</article></div>${departmentFocus(r)}<article class="card"><h2>Participação por departamento</h2><p class="desc">Venda do departamento ÷ faturamento total da loja no mesmo período.</p>${table(['Departamento','Vendas','Meta participação','Participação real','Desvio p.p.'],r.map(x=>{const goal=(data.metas||[]).find(g=>g.codigo===x.code)?.meta_participacao??null;return [esc(x.code+' · '+x.name),money(x.sales),pct(goal),pct(x.salesShare),goal==null||x.salesShare==null?'—':pp(x.salesShare-goal)]}))}</article>${targets()}
  <article class="card"><div class="section-title compact"><div><span class="section-kicker">DIA A DIA</span><h2>Meta diária × realizado</h2></div></div><p class="desc">A meta diária da loja é distribuída pelo percentual oficial do departamento quando houver filtro setorial.</p>${dailySalesGoalChart()}</article>
   <div class="section-title"><h2>Departamento → Produto</h2><button id="salesCsv">Exportar produtos CSV</button></div><article class="card"><div class="searchrow"><input id="productSearch" placeholder="Buscar SKU ou produto" value="${esc(productQuery)}"><select id="productStatus"><option value="">Todos os status</option><option>Ativo</option><option>Inativo</option><option>Nao informado</option></select></div><div id="products"></div></article>`;
 }
@@ -379,6 +380,7 @@ function products(){
 async function loadSalesProducts(){
  if(!data||page!==2)return;
  const key=[activeStore,context.start,context.end,$('#dept').value,data.revision].join('|');
+ if(context.sources.some(x=>x.endsWith(': mensal'))){salesProductKey=key;salesProductRows=[];salesProductError='A base do período contém totais mensais, mas não o detalhamento diário completo por SKU. Importe as vendas diárias para comparar produtos.';salesProductLoading=false;renderProducts();return;}
  if(key===salesProductKey){renderProducts();return}
  const token=++salesProductToken;
  salesProductKey=key;salesProductRows=[];salesProductError='';salesProductLoading=true;renderProducts();
